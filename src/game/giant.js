@@ -27,6 +27,9 @@ export const BURROW_GRACE = 2.2; // seconds without a press before he shakes you
 const LEAN_IN_MAX = 0.9; // most he will lean in over the table
 const BEHIND = -(SLAB.az + 0.4); // past this z you are getting round him
 const CUP_TIP_FALL = 0.5; // landing on a rim from this high knocks the cup over
+const THROW_TIME = 2.4; // seconds in the air when he throws you back
+const THROW_HEIGHT = 9; // how high the arc goes
+const FOG_EDGE = -5.0; // run this far into the fog on his side before he has come and he comes for you
 const PATIENCE_WARN = 18; // seconds on his table without choosing before he says "Choose."
 const PATIENCE_CRUSH = 28; // ...and before he brings his fist down on you
 
@@ -120,6 +123,7 @@ export class Giant {
     this.extra = 0;
     this.eyeCooldown = 0;
     this.throwing = null;
+    this.lurking = false;
     this.killedBy = null;
     this.patience = 0;
     this.warned = false;
@@ -283,23 +287,45 @@ export class Giant {
   }
 
   // ---- getting round him ----------------------------------------------------------------------
-  startThrow(player) {
+  startThrow(player, where = 'behind the table') {
     this.throwing = { t: 0, from: { ...player.pos } };
     player.locked = true;
     if (player.grip) player.release('grabbed by the giant');
-    this.log('giant_throw', { from: player.p3() });
+    this.log('giant_throw', { from: player.p3(), where });
     this.onShake && this.onShake(1.2);
+  }
+
+  // out of the fog: he leans down, his hand comes up from the ground and flings you away
+  updateLurk(t) {
+    const m = this.model;
+    const k = ease(seg(t, 0, 0.4));
+    m.lean.rotation.x = 0.55 * k;
+    m.neck.rotation.x = HEAD_TILT;
+    m.arms.forEach((a, i) => { a.pivot.rotation.x = i ? -0.4 - 1.6 * ease(seg(t, 0.15, 0.6)) : 0.1; a.pivot.rotation.z = 0; });
+    if (t > 1.2) m.root.position.z -= 0.02; // back into the fog
+  }
+
+  hideAway() {
+    const m = this.model;
+    m.root.visible = false;
+    m.root.position.set(0, 0, START_Z);
+    m.lean.rotation.set(0, 0, 0);
+    m.neck.rotation.set(0, 0, 0);
+    m.arms.forEach((a) => a.pivot.rotation.set(0, 0, 0));
   }
 
   updateThrow(dt, player) {
     const th = this.throwing;
     th.t += dt;
-    const k = ease(seg(th.t, 0, 1.6));
+    const k = ease(seg(th.t, 0, THROW_TIME));
     const f = th.from, to = SPAWN;
-    player.pos = { x: f.x + (to.x - f.x) * k, y: f.y + (to.y - f.y) * k + Math.sin(Math.PI * k) * 6, z: f.z + (to.z - f.z) * k };
+    player.pos = { x: f.x + (to.x - f.x) * k, y: f.y + (to.y - f.y) * k + Math.sin(Math.PI * k) * THROW_HEIGHT, z: f.z + (to.z - f.z) * k };
     player.vel = { x: 0, y: 0, z: 0 };
-    if (th.t >= 1.6) {
+    // the hand that threw you, if he came out of the fog for it, goes back into it
+    if (this.lurking) this.updateLurk(th.t);
+    if (th.t >= THROW_TIME) {
       this.throwing = null;
+      if (this.lurking) { this.lurking = false; if (this.state === 'away') this.hideAway(); }
       player.locked = false;
       player.pos = { x: to.x, y: to.y, z: to.z };
       player.airMaxY = to.y;
@@ -344,7 +370,20 @@ export class Giant {
     this.updateDrops(dt);
     this.updateCups(dt, player);
     if (this.throwing) this.updateThrow(dt, player);
-    if (this.state === 'away' || this.state === 'gone') return;
+    if (this.state === 'away') {
+      // skipping the table and running into the fog where he comes from: he is there
+      if (!this.throwing && player.alive && !player.locked && player.pos.z < FOG_EDGE) {
+        this.lurking = true;
+        this.lurkFrom = { x: player.pos.x, z: player.pos.z };
+        const m = this.model;
+        m.root.visible = true;
+        m.root.position.set(player.pos.x * 0.5, 0, player.pos.z - 3.2);
+        m.root.rotation.set(0, 0, 0);
+        this.startThrow(player, 'fog');
+      }
+      return;
+    }
+    if (this.state === 'gone') return;
     this.t += dt;
     this.eyeCooldown = Math.max(0, this.eyeCooldown - dt);
     const t = this.t, m = this.model;

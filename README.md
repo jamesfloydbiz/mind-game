@@ -55,6 +55,9 @@ Changes James asked for on 2026-10-13, layered on the brief in `docs/BRIEF.md`:
 - **Knocking a cup over:** push (E) while standing on a cup's rim, or land on a rim from 0.5+ up
   (e.g. off his arm). It tips the way you push or were moving; the poison spills, and if it reaches
   his hands, arms or face he convulses and dies (`method: poison`). Spill on yourself and you die too.
+- **Skipping the table:** run into the fog on his side (z < -5) before you have reached the top and
+  he looms out of it and throws you back to the start (`giant_throw`, `where: fog`). Throws take
+  2.4s along an arc 9 high.
 - **Getting round him:** once he is at the table, going past the back of it (z < -(slab + 0.4)),
   on the ground or along his arm, makes him grab you and throw you back to the start: "You must make
   the choice on the table." (`giant_throw`)
