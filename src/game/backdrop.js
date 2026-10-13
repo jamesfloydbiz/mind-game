@@ -43,6 +43,8 @@ void main() {
   float haze = 0.06 * fbm(az * 3.0 + uTime * 0.01) * smoothstep(0.25, 0.0, abs(el - 0.08));
   col = mix(col, uFog * 1.02, haze);
   if (el < 0.0) col = uFog;
+  // the far side, where the giant comes from, is lost in fog
+  col = mix(col, uFog, smoothstep(0.05, -0.55, d.z) * 0.97);
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>

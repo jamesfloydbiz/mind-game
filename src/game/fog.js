@@ -45,7 +45,10 @@ export function installHeightFog() {
   #ifdef FOG_EXP2
     float mgGround = exp(-max(vFogWorld.y, 0.0) * 3.2);
     float mgPatch = 0.6 + 0.8 * mgNoise(vFogWorld.xz * 0.45) * mgNoise(vFogWorld.xz * 1.3 + 7.0);
-    float mgDensity = fogDensity * (0.13 + 0.8 * mgGround * mgPatch);
+    // a wall of fog on the giant's side of the table: thick from just behind the table outward,
+    // so nothing shows there until he walks out of it
+    float mgWall = smoothstep(-4.2, -8.5, vFogWorld.z);
+    float mgDensity = fogDensity * (0.13 + 0.8 * mgGround * mgPatch + 1.6 * mgWall);
     float fogFactor = 1.0 - exp(- mgDensity * mgDensity * vFogDepth * vFogDepth);
   #else
     float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
