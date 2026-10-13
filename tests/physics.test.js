@@ -1,5 +1,6 @@
 import { test, expect } from 'bun:test';
 import { createWorld, addBox, addCapsule, addSphere, closestPoint, stepWorld, breakBody, impulseFrom, refreshBounds } from '../src/game/physics.js';
+import { SHOCK_RADIUS, SHOCK_FALLOFF } from '../src/game/constants.js';
 
 const close = (a, b, e = 1e-6) => expect(Math.abs(a - b)).toBeLessThan(e);
 
@@ -64,15 +65,15 @@ test('breakBody turns a static surface into a loose, grip-less falling object', 
   expect(c.pos.y).toBeLessThan(y0);
 });
 
-test('impulseFrom falls off with distance and stops at 3.6', () => {
+test('impulseFrom falls off with distance and stops at SHOCK_RADIUS', () => {
   const w = createWorld();
   const near = addSphere(w, { x: 0.5, y: 0.1, z: 0 }, 0.05, { dynamic: true });
   const far = addSphere(w, { x: 2.0, y: 0.1, z: 0 }, 0.05, { dynamic: true });
-  const out = addSphere(w, { x: 4.0, y: 0.1, z: 0 }, 0.05, { dynamic: true });
+  const out = addSphere(w, { x: SHOCK_RADIUS + 0.4, y: 0.1, z: 0 }, 0.05, { dynamic: true });
   impulseFrom(w, { x: 0, y: 0.1, z: 0 }, 4.2, null);
   const sp = (b) => Math.hypot(b.vel.x, b.vel.y, b.vel.z);
   expect(sp(near)).toBeGreaterThan(sp(far));
   expect(sp(out)).toBe(0);
   expect(near.vel.y).toBeGreaterThan(0); // upward bias
-  close(sp(near), 4.2 * Math.exp(-0.5 / 0.75), 1e-6);
+  close(sp(near), 4.2 * Math.exp(-0.5 / SHOCK_FALLOFF), 1e-6);
 });
