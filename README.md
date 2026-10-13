@@ -50,3 +50,9 @@ T.st(); T.evs();
 - **Fog:** keeps FOG_COLOR/FOG_DENSITY but is evaluated as height fog (thick, patchy mist low on the
   ground, thinning with height) instead of uniform FogExp2. No mist billboards.
 - **Spawn:** moved from (3.2, 0.06, 2.4) to (5.4, 0.06, 4.1) so the tree is approached out of the mist.
+- **Trunk:** the brief's solid box + stilt-root poles read as a building, so the trunk is now an
+  hourglass of 50 braided root fibres (flared foot, pinched waist, wide crown) matched to James's
+  film reference, with corner knots and roots hanging off the crown. Every fibre is a slick
+  collider of the same size (no invisible walls); hanging roots are grippable but stay above 1.3
+  and at least 0.4 away from every route. The 40 distant roots are dropped (they read as pale
+  spikes once fogged).

@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { addBox, addCapsule, addSphere } from './physics.js';
 import { TABLE_TOP_Y } from './constants.js';
+import { buildTrunk } from './trunk.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const RIM_X = 2.06, RIM_Z = 1.33;
@@ -87,17 +88,8 @@ export function buildWorld(world, scene, mats) {
   gMesh.receiveShadow = true;
   group.add(gMesh);
 
-  // --- Trunk: one solid box, grip none — the root wall is sheer and slick.
-  const trunk = addBox(world, { x: 0, y: 1.225, z: 0 }, { x: 2.07, y: 1.225, z: 1.34 }, { label: 'trunk', kind: 'bark', grip: 'none' });
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    addBox(world, { x: 1.85 * sx, y: 1.225, z: 1.12 * sz }, { x: 0.22, y: 1.225, z: 0.22 }, { label: 'trunk leg', kind: 'bark', grip: 'none' });
-  }
-  // body of the trunk between the roots: a dark tapered column, squashed to the footprint
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.15, 2.45, 24, 4), mats.barkDeep);
-  body.scale.set(1.9, 1, 1.12);
-  body.position.y = 1.225;
-  body.castShadow = body.receiveShadow = true;
-  group.add(body);
+  // --- Trunk: an hourglass of braided root fibres (see trunk.js).
+  const trunk = buildTrunk(world, batch, group, mats);
 
   // --- Crown / apron and slab.
   addBox(world, { x: 0, y: 2.28, z: 0 }, { x: 2.18, y: 0.2, z: 1.32 }, { label: 'crown', kind: 'bark' });
@@ -111,7 +103,7 @@ export function buildWorld(world, scene, mats) {
     const band = new THREE.Mesh(new THREE.BoxGeometry(4.38, 0.05, 2.66), mats.rootDark);
     band.position.y = 2.69;
     group.add(band);
-    const heart = new THREE.Mesh(new THREE.BoxGeometry(4.3, 0.4, 2.6), mats.barkDeep);
+    const heart = new THREE.Mesh(new THREE.BoxGeometry(4.3, 0.4, 2.6), mats.rootDark);
     heart.position.y = 2.28;
     heart.castShadow = heart.receiveShadow = true;
     group.add(heart);
@@ -136,51 +128,6 @@ export function buildWorld(world, scene, mats) {
       }
     }
   }
-  // 20 veins of root climbing into the underside of the slab
-  for (let i = 0; i < 20; i++) {
-    const t = i / 20;
-    const per = perimeterPoint(t, 2.1, 1.28);
-    batch.add('rootDark', strandGeometry({ x: per.x * 0.92, y: 1.9, z: per.z * 0.92 }, { x: per.x, y: 2.46, z: per.z }, 0.07, 0.02, 500 + i, 7));
-  }
-
-  // --- Stilt roots. ~37 wall roots round the rim (feet inside the collision footprint).
-  for (let i = 0; i < 37; i++) {
-    const t = (i + R() * 0.5) / 37;
-    const p = perimeterPoint(t, RIM_X, RIM_Z);
-    const top = { x: p.x * 0.97, y: 2.1 + R() * 0.25, z: p.z * 0.97 };
-    const foot = { x: p.x * 0.995, y: 0, z: p.z * 0.995 };
-    batch.add(R() < 0.5 ? 'root' : 'rootDark', strandGeometry(foot, top, 0.16 + R() * 0.1, 0.05, 900 + i));
-  }
-  // 26 crowding the inside
-  for (let i = 0; i < 26; i++) {
-    const p = perimeterPoint(R(), RIM_X * 0.8, RIM_Z * 0.75);
-    batch.add('rootDark', strandGeometry({ x: p.x, y: 0, z: p.z }, { x: p.x * 0.6, y: 2.2, z: p.z * 0.6 }, 0.22, 0.07, 1000 + i));
-  }
-  // 16 arching out onto the ground in two segments (feet kept just inside the footprint)
-  for (let i = 0; i < 16; i++) {
-    const deg = (i / 16) * 360 + R() * 8;
-    const e = rimExit(deg);
-    const hi = { x: e.x * 0.98, y: 1.0 + R() * 0.5, z: e.z * 0.98 };
-    const knee = { x: e.x * 0.995, y: 0.45, z: e.z * 0.995 };
-    const foot = { x: e.x * 0.99, y: 0, z: e.z * 0.99 };
-    batch.add('root', strandGeometry(knee, hi, 0.13, 0.07, 1100 + i));
-    batch.add('root', strandGeometry(foot, knee, 0.17, 0.13, 1150 + i));
-  }
-  // 10 vines strangling the wall
-  for (let i = 0; i < 10; i++) {
-    const t0 = R();
-    for (let s = 0; s < 6; s++) {
-      const a = perimeterPoint((t0 + s * 0.012) % 1, RIM_X + 0.02, RIM_Z + 0.02);
-      const b = perimeterPoint((t0 + (s + 1) * 0.012) % 1, RIM_X + 0.02, RIM_Z + 0.02);
-      batch.add('vine', strandGeometry({ x: a.x, y: 0.2 + s * 0.35, z: a.z }, { x: b.x, y: 0.2 + (s + 1) * 0.35, z: b.z }, 0.022, 0.02, 1200 + i * 10 + s, 6));
-    }
-  }
-  // 18 lianas hanging off the crown (kept just inside the footprint so they are not handholds)
-  for (let i = 0; i < 18; i++) {
-    const p = perimeterPoint(R(), RIM_X - 0.01, RIM_Z - 0.01);
-    batch.add('vine', strandGeometry({ x: p.x, y: 2.3, z: p.z }, { x: p.x, y: 1.2 + R() * 0.9, z: p.z }, 0.02, 0.006, 1300 + i, 5));
-  }
-
   // --- SIX CLIMB ROUTES ---
   // A: a thick vine that holds, three knots to rest on.
   routes.push(vineRoute(world, batch, 'A', 2.42, -0.85, {}));
@@ -253,13 +200,8 @@ export function buildWorld(world, scene, mats) {
   long.forEach((d, i) => ridge(d, 2.6 + R() * 3.6, i));
   short.forEach((d, i) => ridge(d, 1.7 + R() * 1.9, 100 + i));
 
-  // --- 40 distant roots and two rocks fading into the fog.
-  for (let i = 0; i < 40; i++) {
-    const ang = R() * Math.PI * 2, d = 9 + R() * 16;
-    const x = Math.cos(ang) * d, z = Math.sin(ang) * d;
-    const h = 1.5 + R() * 5;
-    batch.add('rootDark', strandGeometry({ x, y: -0.2, z }, { x: x + (R() - 0.5) * 2, y: h, z: z + (R() - 0.5) * 2 }, 0.25 + R() * 0.4, 0.04, 3000 + i, 8));
-  }
+  // --- Two rocks fading into the fog. (The brief's 40 distant roots read as pale spikes against
+  // the backdrop hills once fogged, so they are left out; the backdrop carries the distance.)
   for (const [x, z, s] of [[-6.5, 4.2, 1.1], [7.5, -5.5, 1.6]]) {
     const geo = new THREE.IcosahedronGeometry(s, 2);
     const p = geo.attributes.position;
