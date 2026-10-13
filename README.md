@@ -47,3 +47,6 @@ T.st(); T.evs();
   possible from a rim with a running jump.
 - **Backdrop:** a painted sky dome with layered misty hills until a World Labs Marble splat world is
   dropped in at `public/backdrops/world.spz` (rendered with Spark).
+- **Fog:** keeps FOG_COLOR/FOG_DENSITY but is evaluated as height fog (thick, patchy mist low on the
+  ground, thinning with height) instead of uniform FogExp2. No mist billboards.
+- **Spawn:** moved from (3.2, 0.06, 2.4) to (5.4, 0.06, 4.1) so the tree is approached out of the mist.

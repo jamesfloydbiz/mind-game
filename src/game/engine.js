@@ -9,7 +9,7 @@ import { Giant } from './giant.js';
 import { Logger } from './logger.js';
 import { loadInState } from './loadin.js';
 import { buildBackdrop } from './backdrop.js';
-import { buildMist } from './mist.js';
+import { installHeightFog } from './fog.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -34,6 +34,7 @@ export class Engine {
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
+    installHeightFog();
     const scene = (this.scene = new THREE.Scene());
     scene.fog = new THREE.FogExp2(FOG_COLOR, FOG_DENSITY);
     this.camera = new THREE.PerspectiveCamera(58, 1, 0.01, 900);
@@ -54,7 +55,6 @@ export class Engine {
     this.mats = materials();
     this.backdrop = buildBackdrop(scene);
     this.backdrop.tryMarble();
-    this.mist = buildMist(scene);
 
     this.world = createWorld();
     this.level = buildWorld(this.world, scene, this.mats);
@@ -249,7 +249,6 @@ export class Engine {
       this.composer.setSize(this.W, this.H);
     }
     this.canvas.style.imageRendering = li.done ? 'auto' : 'pixelated';
-    this.mist.update(this.t);
     this.composer.render();
   }
 
@@ -271,7 +270,6 @@ export class Engine {
       if (o.geometry) o.geometry.dispose();
     });
     for (const m of Object.values(this.mats)) { m.map?.dispose(); m.bumpMap?.dispose(); }
-    this.mist.dispose();
     this.composer.dispose();
     this.renderer.dispose();
     if (window.game === this) window.game = null;

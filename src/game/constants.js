@@ -13,7 +13,9 @@ export const PUSH_SPEED = 1.5;
 export const SPRINT_MULTIPLIER = 1.85;
 export const COYOTE_TIME = 0.14;
 export const TABLE_TOP_Y = 2.7;
-export const SPAWN = { x: 3.2, y: 0.06, z: 2.4 };
+// Brief had {3.2, 0.06, 2.4}; moved further out (James, 2026-10-13) so the tree is approached
+// out of the mist rather than started beside.
+export const SPAWN = { x: 5.4, y: 0.06, z: 4.1 };
 export const LIVES_PER_RUN = 3;
 export const DEATH_HEIGHT = 0.9;
 export const FALL_LOG_HEIGHT = 0.45;
