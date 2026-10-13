@@ -16,7 +16,7 @@ import { SLAB, onSlab } from './world.js';
 
 const PARK = { x: 0, y: -40, z: 0 };
 const PARK2 = { x: 0, y: -40.1, z: 0 };
-const STAND_Z = -6.6; // feet; behind the table
+const STAND_Z = -5.6; // feet; just behind the table, close enough to lean his face over it
 const START_Z = -9.5 * GS;
 const ease = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 const easeIn = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * t);
@@ -24,10 +24,11 @@ const seg = (t, a, b) => Math.max(0, Math.min(1, (t - a) / (b - a)));
 
 export const BURROW_PRESSES = 18;
 export const BURROW_GRACE = 2.2; // seconds without a press before he shakes you off
-const LEAN_IN_MAX = 0.45; // most he will lean in over the table
-const EYE_ABOVE_TABLE = 0.42; // he leans until his eye hangs this far above the tabletop
+const LEAN_IN_MAX = 0.9; // most he will lean in over the table
 const BEHIND = -(SLAB.az + 0.4); // past this z you are getting round him
 const CUP_TIP_FALL = 0.5; // landing on a rim from this high knocks the cup over
+const PATIENCE_WARN = 18; // seconds on his table without choosing before he says "Choose."
+const PATIENCE_CRUSH = 28; // ...and before he brings his fist down on you
 
 export class Giant {
   constructor(world, scene, mats, log, notice) {
@@ -53,10 +54,10 @@ export class Giant {
 
     // his table, already set
     this.items = [
-      { name: 'left cup', kind: 'cup', x: -0.42 * WS, z: 0.55 * WS },
-      { name: 'right cup', kind: 'cup', x: 0.42 * WS, z: 0.55 * WS },
-      { name: 'cheese', kind: 'cheese', x: -1.6 * WS, z: -0.9 * WS },
-      { name: 'loaf', kind: 'loaf', x: 1.65 * WS, z: -0.8 * WS },
+      { name: 'left cup', kind: 'cup', x: -0.42 * WS, z: -0.4 * WS },
+      { name: 'right cup', kind: 'cup', x: 0.42 * WS, z: -0.4 * WS },
+      { name: 'cheese', kind: 'cheese', x: -1.75 * WS, z: -0.2 * WS },
+      { name: 'loaf', kind: 'loaf', x: 1.75 * WS, z: -0.3 * WS },
     ];
     for (const it of this.items) {
       it.mesh = it.kind === 'cup' ? buildCup(mats) : it.kind === 'cheese' ? buildCheese(mats) : buildLoaf(mats);
@@ -71,6 +72,7 @@ export class Giant {
         for (const s of spec.beads) it.bodies.push(addCapsule(world, s.a, s.b, s.r, { label: `${it.name} lip`, kind: 'cup', meta: { ...meta, lip: true } }));
         it.bodies.push(addCapsule(world, spec.column.a, spec.column.b, spec.column.r, { label: `${it.name} stem`, kind: 'cup', meta }));
         it.bodies.push(addBox(world, spec.floor.p, spec.floor.half, { label: `${it.name} drink`, kind: 'drink', grip: 'none', meta: { cupInterior: true, cup: it.name } }));
+        for (const b of it.bodies) b.home = b.shape === 'capsule' ? { a: { ...b.a }, b: { ...b.b } } : { p: { ...b.pos } };
         // the cup lying on its side, once knocked over
         it.fallen = addCapsule(world, PARK, PARK2, CUP.rTop * CUP_S * 0.8, { label: `${it.name} (knocked over)`, kind: 'cup', meta });
         it.fallen.parked = true;
@@ -119,6 +121,9 @@ export class Giant {
     this.eyeCooldown = 0;
     this.throwing = null;
     this.killedBy = null;
+    this.patience = 0;
+    this.warned = false;
+    this.crush = null;
     const m = this.model;
     m.root.visible = false;
     m.root.position.set(0, 0, START_Z);
@@ -127,6 +132,21 @@ export class Giant {
     m.neck.rotation.set(0, 0, 0);
     m.arms.forEach((a) => a.pivot.rotation.set(0, 0, 0));
     this.parkAll();
+    // put the table back as it was
+    for (const it of this.items || []) {
+      if (it.kind !== 'cup' || !it.tipped) continue;
+      this.scene.add(it.mesh);
+      it.mesh.position.set(it.x, TABLE_TOP_Y, it.z);
+      it.mesh.quaternion.identity();
+      if (it.pivot) { this.scene.remove(it.pivot); it.pivot = null; }
+      for (const b of it.bodies) { b.parked = false; if (b.home.p) placeBody(b, b.home.p); else placeBody(b, null, b.home.a, b.home.b); }
+      it.fallen.parked = true;
+      placeBody(it.fallen, null, PARK, PARK2);
+      it.puddle.visible = false;
+      it.tipped = null;
+    }
+    this.poisonPart = null;
+    this.model.eyeLight.intensity = 0.12;
   }
 
   start() {
@@ -183,7 +203,7 @@ export class Giant {
     if (!it || it.tipped) return false;
     const l = Math.hypot(dir.x, dir.z) || 1;
     const d = { x: dir.x / l, z: dir.z / l };
-    it.tipped = { t: 0, d, done: false };
+    it.tipped = { t: 0, d, done: false, cause };
     this.log('cup_tipped', { cup: name, cause, dir: { x: +d.x.toFixed(2), z: +d.z.toFixed(2) } });
     // the upright cup's colliders leave; whoever stood on it falls with it
     for (const b of it.bodies) { b.parked = true; placeBody(b, b.shape === 'capsule' ? null : PARK, PARK, PARK2); }
@@ -227,9 +247,20 @@ export class Giant {
         this.spray({ x: land.x, y: TABLE_TOP_Y + 0.2, z: land.z }, 30, { x: tp.d.x, y: 0.6, z: tp.d.z }, true);
         // does it reach him? his hands, his jaw, his face
         if (this.here) {
-          const parts = [...this.limbs.flatMap((l) => [l.fist.pos, ...l.caps.map((c) => c.pos)]), this.jaw.pos, this.head.pos];
-          const hit = parts.some((p) => Math.hypot(p.x - land.x, p.z - land.z) < pr + 1.0 && p.y < TABLE_TOP_Y + 1.6 * GS);
-          if (hit) this.poison(it.name);
+          // where it lands decides what it does to him: in his mouth he drinks it; in his eyes it
+          // blinds him; on his hands it works in through the skin
+          const near = (p, r) => Math.hypot(p.x - land.x, p.z - land.z) < r && p.y < TABLE_TOP_Y + 1.6 * GS;
+          const mouth = new THREE.Vector3();
+          this.model.mouthMark.getWorldPosition(mouth);
+          const eye = this.eyeWorld();
+          const hands = this.limbs.flatMap((l, i) => [l.fist.pos, l.caps[2].pos].map((p) => ({ p, side: i })));
+          // a spill that reaches his face: poured (pushed) it runs into his mouth and he drinks it;
+          // knocked over by something landing on it, it splashes up into his eyes
+          const face = near(mouth, pr + 0.7) || near(eye, pr + 0.7);
+          let part = null, side = 0;
+          if (face) part = tp.cause === 'pushed' ? 'mouth' : 'eyes';
+          else { const l = hands.find((q) => near(q.p, pr + 0.45)); if (l) { part = 'hands'; side = l.side; } }
+          if (part) this.poison(it.name, part, side);
           else this.log('cup_spilled', { cup: it.name, reached_giant: false });
         } else this.log('cup_spilled', { cup: it.name, reached_giant: false });
         // if the animal is in the spill, the poison does what it does
@@ -240,11 +271,13 @@ export class Giant {
     }
   }
 
-  poison(cup) {
+  poison(cup, part = 'hands', side = 0) {
     this.state = 'poisoned';
     this.t = 0;
-    this.killedBy = 'poison';
-    this.log('giant_poisoned', { cup });
+    this.poisonPart = part;
+    this.poisonSide = side;
+    this.killedBy = `poison_${part}`;
+    this.log('giant_poisoned', { cup, part });
     this.notice([], 0);
     if (this.player && this.player.locked && !this.throwing) this.releasePlayer(0.5);
   }
@@ -321,7 +354,6 @@ export class Giant {
       const w = ease(seg(t, 0, 1.7));
       m.root.position.z = START_Z + (STAND_Z - START_Z) * w;
       m.root.position.y = t < 1.7 ? Math.abs(Math.sin(t * 7.4)) * 0.12 * GS * (1 - w * 0.5) : 0;
-      m.neck.rotation.x = HEAD_TILT * w;
       // arms: swing while walking, raise (1.7 -> 2.1), slam (2.1 -> 2.4), then stay planted
       let armX;
       if (t < 1.7) armX = Math.sin(t * 7.4) * 0.25 * (1 - w);
@@ -332,14 +364,18 @@ export class Giant {
       const near = t > 2.4 && player.pos.y > TABLE_TOP_Y - 0.1 ? 1 : 0;
       this.leanIn += (near - this.leanIn) * Math.min(1, dt * 0.9);
       if (t > 2.4) {
-        const e = this.eyeWorld();
-        const want = TABLE_TOP_Y + EYE_ABOVE_TABLE;
-        this.extra = Math.max(0, Math.min(LEAN_IN_MAX, this.extra + (e.y - want) * dt * 0.6 * this.leanIn - (1 - this.leanIn) * this.extra * dt));
+        // he lowers his face until his chin rests on the tabletop
+        const jaw = new THREE.Vector3();
+        this.model.jawMark.getWorldPosition(jaw);
+        const want = TABLE_TOP_Y + 0.4 * GS - 0.08; // chin pressed on the table: no gap to run under
+        this.extra = Math.max(0, Math.min(LEAN_IN_MAX, this.extra + (jaw.y - want) * dt * 0.6 * this.leanIn - (1 - this.leanIn) * this.extra * dt));
       }
       const extra = this.extra;
       m.arms.forEach((a, i) => { a.pivot.rotation.x = t < 1.7 ? armX * (i ? 1 : -1) : armX - (t >= 2.4 ? extra : 0); a.pivot.rotation.z = 0; });
       const breath = this.state === 'present' ? Math.sin(t * 1.3) * 0.015 : 0;
       m.lean.rotation.x = LEAN * w + breath + extra;
+      // he lifts his face as he leans, so it looks at the table rather than down into it
+      m.neck.rotation.x = HEAD_TILT * w - (LEAN * w + extra) * 0.6;
       if (t >= 2.4) this.plantFists();
 
       if (t >= 2.4 && !this.slammed) {
@@ -362,7 +398,9 @@ export class Giant {
       if (this.state === 'present') {
         const toP = Math.atan2(player.pos.x - m.root.position.x, player.pos.z - m.root.position.z);
         m.neck.rotation.y += (Math.max(-0.35, Math.min(0.35, toP)) - m.neck.rotation.y) * Math.min(1, dt * 1.5);
+        this.updatePatience(dt, player);
       }
+      if (this.crush) this.updateCrush(dt, player);
       m.root.updateMatrixWorld(true);
       this.syncColliders();
       if (t > 2.4 && player.alive && !player.locked && !this.throwing) {
@@ -418,22 +456,42 @@ export class Giant {
     }
 
     if (this.state === 'poisoned') {
-      // the poison does to him what it does to you: convulsions that come fast, then weaken
-      const k = seg(t, 0, 2.6);
+      // three ways the poison takes him, depending on where it landed
+      const part = this.poisonPart;
+      const dur = part === 'mouth' ? 2.0 : part === 'eyes' ? 2.8 : 3.4;
+      const k = seg(t, 0, dur);
       const w = (1 - k) * (1 - k);
-      m.neck.rotation.x = HEAD_TILT - 0.3 * k + Math.sin(t * 29) * 0.12 * w;
-      m.neck.rotation.z = Math.sin(t * 21) * 0.2 * w;
-      m.lean.rotation.x = LEAN + this.extra + Math.sin(t * 17) * 0.04 * w;
-      m.arms.forEach((a, i) => {
-        a.pivot.rotation.x = ARM_DOWN - this.extra - Math.abs(Math.sin(t * (11 + i * 3))) * 1.1 * w;
-        a.pivot.rotation.z = (i ? 1 : -1) * Math.sin(t * 9 + i) * 0.35 * w;
-      });
-      this.model.eyeLight.intensity = 0.12 * (Math.random() < 0.3 ? 0 : 1);
-      if (Math.random() < dt * 10) this.spray(this.eyeWorld(), 2, { x: 0, y: 0.6, z: 1 }, true);
+      if (part === 'mouth') {
+        // he swallows it: head snaps back, hands go to his throat, he gags
+        m.neck.rotation.x = HEAD_TILT - 0.7 * ease(seg(t, 0, 0.3)) + Math.sin(t * 34) * 0.1 * w;
+        m.neck.rotation.z = Math.sin(t * 19) * 0.08 * w;
+        m.arms.forEach((a, i) => { a.pivot.rotation.x = ARM_DOWN - this.extra - 1.1 * ease(seg(t, 0.1, 0.6)); a.pivot.rotation.z = (i ? -1 : 1) * 0.55 * ease(seg(t, 0.1, 0.6)) + Math.sin(t * 27 + i) * 0.08 * w; });
+        m.lean.rotation.x = LEAN + this.extra - 0.15 * k + Math.sin(t * 23) * 0.03 * w;
+        if (Math.random() < dt * 14) this.spray(this.model.jaw ? this.eyeWorld() : this.eyeWorld(), 2, { x: 0, y: 0.4, z: 1 }, true);
+      } else if (part === 'eyes') {
+        // blinded: head thrashes side to side, arms flail at his face, he staggers back
+        m.neck.rotation.y = Math.sin(t * 9) * 0.5 * (0.4 + w);
+        m.neck.rotation.x = HEAD_TILT - 0.3 + Math.sin(t * 13) * 0.15;
+        m.arms.forEach((a, i) => { a.pivot.rotation.x = ARM_DOWN - this.extra - 0.8 - Math.abs(Math.sin(t * (7 + i * 2))) * 1.2 * (0.3 + w); a.pivot.rotation.z = (i ? 1 : -1) * (0.3 + Math.sin(t * 5 + i) * 0.4); });
+        m.root.position.z = STAND_Z - k * 0.6 * GS;
+        this.model.eyeLight.intensity = 0;
+        if (Math.random() < dt * 12) this.spray(this.eyeWorld(), 3, { x: 0, y: 0.6, z: 1 }, true);
+      } else {
+        // through the skin: the poisoned arm goes dead and drops, he stares at it, then folds
+        const s2 = this.poisonSide;
+        m.arms.forEach((a, i) => {
+          if (i === s2) { a.pivot.rotation.x = (ARM_DOWN - this.extra) * (1 - ease(seg(t, 0, 1.2))); a.pivot.rotation.z = (i ? 1 : -1) * 0.15 * ease(seg(t, 0, 1.2)); }
+          else { a.pivot.rotation.x = ARM_DOWN - this.extra + Math.sin(t * 15) * 0.15 * w; a.pivot.rotation.z = 0; }
+        });
+        m.neck.rotation.y = (s2 ? 1 : -1) * 0.45 * ease(seg(t, 0.4, 1.2));
+        m.neck.rotation.x = HEAD_TILT + 0.2 * ease(seg(t, 0.4, 1.2)) + Math.sin(t * 21) * 0.06 * seg(t, 1.8, dur);
+        m.lean.rotation.x = LEAN + this.extra + Math.sin(t * 17) * 0.03 * seg(t, 1.8, dur);
+        this.model.eyeLight.intensity = 0.12 * (Math.random() < 0.25 * k ? 0 : 1);
+      }
       m.root.updateMatrixWorld(true);
       this.syncColliders();
-      if (t >= 2.6) {
-        this.log('stage_complete', { stage: 'giant', giant_slain: true, method: 'poison' });
+      if (t >= dur) {
+        this.log('stage_complete', { stage: 'giant', giant_slain: true, method: this.killedBy });
         this.state = 'falling';
         this.t = 0;
         this.parkAll();
@@ -474,6 +532,86 @@ export class Giant {
         this.onSlain && this.onSlain(this.killedBy);
       }
     }
+  }
+
+  // ---- refusing to choose ----------------------------------------------------------------------
+  updatePatience(dt, player) {
+    const onTable = player.alive && !player.locked && player.pos.y > TABLE_TOP_Y - 0.15 && onSlab(player.pos.x, player.pos.z);
+    if (player.pos.y < TABLE_TOP_Y - 1) { this.patience = 0; this.warned = false; }
+    if (!onTable || this.crush || this.throwing) return;
+    this.patience += dt;
+    if (this.patience > PATIENCE_WARN && !this.warned) {
+      this.warned = true;
+      this.notice(['Choose.'], 3);
+      this.log('giant_impatient', {});
+    }
+    if (this.patience > PATIENCE_CRUSH) this.startCrush(player);
+  }
+
+  startCrush(player) {
+    // the nearer hand comes up and down on the animal
+    const side = player.pos.x < 0 ? 0 : 1;
+    const a = this.model.arms[side];
+    this.crush = { t: 0, side, from: { rx: a.pivot.rotation.x, rz: a.pivot.rotation.z }, raise: null, slam: null, struck: false };
+    this.log('giant_crush', { at: player.p3() });
+    this.notice([], 0);
+  }
+
+  // place a fist at a world point by turning the arm (a few Gauss-Newton steps on two angles)
+  solveArm(a, target, start) {
+    const p = new THREE.Vector3();
+    const at = (rx, rz) => { a.pivot.rotation.x = rx; a.pivot.rotation.z = rz; this.model.root.updateMatrixWorld(true); a.fist.getWorldPosition(p); return [p.x - target.x, p.y - target.y, p.z - target.z]; };
+    let rx = start.rx, rz = start.rz;
+    for (let k = 0; k < 8; k++) {
+      const f = at(rx, rz), e = 1e-3;
+      const fx = at(rx + e, rz), fz = at(rx, rz + e);
+      const J = [0, 1, 2].map((i) => [(fx[i] - f[i]) / e, (fz[i] - f[i]) / e]);
+      // normal equations (2x2)
+      let a11 = 0, a12 = 0, a22 = 0, b1 = 0, b2 = 0;
+      for (let i = 0; i < 3; i++) { a11 += J[i][0] ** 2; a12 += J[i][0] * J[i][1]; a22 += J[i][1] ** 2; b1 += J[i][0] * f[i]; b2 += J[i][1] * f[i]; }
+      const det = a11 * a22 - a12 * a12 || 1e-9;
+      rx -= Math.max(-0.4, Math.min(0.4, (a22 * b1 - a12 * b2) / det));
+      rz -= Math.max(-0.4, Math.min(0.4, (a11 * b2 - a12 * b1) / det));
+      rx = Math.max(-3.4, Math.min(0.2, rx)); rz = Math.max(-1.2, Math.min(1.2, rz));
+    }
+    return { rx, rz };
+  }
+
+  updateCrush(dt, player) {
+    const c = this.crush;
+    c.t += dt;
+    const a = this.model.arms[c.side];
+    const top = TABLE_TOP_Y + 0.2 * GS;
+    if (!c.raise) c.raise = this.solveArm(a, { x: player.pos.x, y: top + 1.6 * GS, z: player.pos.z }, c.from);
+    let pose;
+    if (c.t < 0.8) {
+      // up — the raised fist follows the animal, then fixes on where it is half a second before
+      // it comes down (so moving away in time saves you)
+      if (c.t < 0.55) { c.raise = this.solveArm(a, { x: player.pos.x, y: top + 1.6 * GS, z: player.pos.z }, c.raise); c.aim = { ...player.pos }; }
+      const k = ease(seg(c.t, 0, 0.5));
+      pose = { rx: c.from.rx + (c.raise.rx - c.from.rx) * k, rz: c.from.rz + (c.raise.rz - c.from.rz) * k };
+    } else if (c.t < 1.05) {
+      if (!c.slam) c.slam = this.solveArm(a, { x: c.aim.x, y: top, z: c.aim.z }, c.raise);
+      const k = easeIn(seg(c.t, 0.8, 1.05));
+      pose = { rx: c.raise.rx + (c.slam.rx - c.raise.rx) * k, rz: c.raise.rz + (c.slam.rz - c.raise.rz) * k };
+    } else {
+      pose = c.slam;
+      if (!c.struck) {
+        c.struck = true;
+        const f = new THREE.Vector3();
+        a.pivot.rotation.x = pose.rx; a.pivot.rotation.z = pose.rz;
+        this.model.root.updateMatrixWorld(true);
+        a.fist.getWorldPosition(f);
+        impulseFrom(this.world, { x: f.x, y: f.y, z: f.z }, SLAM_STRENGTH * 0.7, player);
+        this.onShake && this.onShake(1.4);
+        const hit = player.alive && Math.hypot(player.pos.x - f.x, player.pos.z - f.z) < 0.3 * GS + 0.08 && player.pos.y < f.y + 0.2 * GS + 0.1;
+        this.log('giant_crush_result', { hit });
+        if (hit) player.die('crushed');
+      }
+    }
+    a.pivot.rotation.x = pose.rx;
+    a.pivot.rotation.z = pose.rz;
+    if (c.t > 1.8) { this.crush = null; this.patience = PATIENCE_WARN; }
   }
 
   // the body on the ground becomes something to walk on and climb

@@ -94,6 +94,9 @@ export function buildGiant(mats) {
   const jawMark = new THREE.Object3D();
   jawMark.position.set(0, 0.12, 0.18);
   neck.add(jawMark);
+  const mouthMark = new THREE.Object3D(); // the front of his mouth
+  mouthMark.position.set(0, 0.2, 0.52);
+  neck.add(mouthMark);
   const eyeLight = new THREE.PointLight(0x66ff00, 0.12, 0.6, 2);
   eyeLight.position.set(0, 0.78, 0.7);
   neck.add(eyeLight);
@@ -167,7 +170,7 @@ export function buildGiant(mats) {
     pivot.add(hold);
     arms.push({ side: sx, pivot, fist, marks, hold });
   }
-  return { root, lean, neck, eye, arms, eyeLight, headMark, jawMark };
+  return { root, lean, neck, eye, arms, eyeLight, headMark, jawMark, mouthMark };
 }
 
 function mergeAll(list) {

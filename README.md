@@ -59,8 +59,7 @@ Changes James asked for on 2026-10-13, layered on the brief in `docs/BRIEF.md`:
 - **Results screen:** on game over and when the giant is down — time to the top, time the choice was
   put, when and how the paradigm was broken (first grab of him, eye, cup tipped, or trying to get
   round), how he died, drinks, throws, lives used, roots tried by kind, grabs/refusals/falls.
-- **Killing the giant:** reach his eye (a jump from the table in front of his face, or climbing his
-  jaw/head, which are solid). You are then in it: mash any key/button 18 times to finish him (shake
+- **Killing the giant:** reach his eye by climbing his jaw and head. You are then in it: mash any key/button 18 times to finish him (shake
   and ichor); stop for 2.2s and he shakes you off. He topples back and his body lies on the ground,
   solid and walkable.
 - **Cup lip:** thicker, one continuous ring; narrow tops can be stood and balanced on.

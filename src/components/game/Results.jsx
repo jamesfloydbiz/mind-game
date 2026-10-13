@@ -1,5 +1,12 @@
 import { formatTime } from './formatTime.js';
 
+const METHOD = {
+  eye: 'through the eye',
+  poison_mouth: 'made him drink the poison',
+  poison_eyes: 'poison in his eyes',
+  poison_hands: 'poison through his hands',
+};
+
 // What the run measured. Times are from the start of the run (load-in excluded).
 export default function Results({ s }) {
   if (!s) return null;
@@ -10,9 +17,10 @@ export default function Results({ s }) {
     ['Faced the choice', t(s.promptMs)],
     ['Broke the paradigm', s.breakMs == null ? 'never' : `${t(s.breakMs)}${gap(s.promptMs, s.breakMs) != null ? `  (+${formatTime(gap(s.promptMs, s.breakMs))} after the choice)` : ''}`],
     ['How', s.breakHow || '—'],
-    ['Killed the giant', s.killedMs == null ? 'no' : `${t(s.killedMs)} · ${s.method === 'eye' ? 'through the eye' : s.method === 'poison' ? 'his own poison' : s.method}`],
+    ['Killed the giant', s.killedMs == null ? 'no' : `${t(s.killedMs)} · ${METHOD[s.method] || s.method}`],
     ['Drank from a cup', s.drank.length ? `${s.drank.length}× (${s.drank.join(', ')})` : 'never'],
     ['Thrown back for going round him', String(s.thrown)],
+    ['Fist brought down for not choosing', String(s.crushes)],
     ['Lives used', `${s.livesUsed} of 3${s.deaths.length ? ` · ${Object.entries(s.deaths.reduce((m, c) => ((m[c] = (m[c] || 0) + 1), m), {})).map(([c, n]) => (n > 1 ? `${c} ×${n}` : c)).join(', ')}` : ''}`],
     ['Roots tried', `${s.rootsTried.sound} held · ${s.rootsTried.rotten} rotten · ${s.rootsTried.wet} wet`],
     ['Grabs · refused · falls', `${s.grabs} · ${s.refused} · ${s.falls}`],

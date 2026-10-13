@@ -215,6 +215,8 @@ export class Engine {
     if (type === 'giant_throw') S.thrown++;
     if (type === 'eye_reached') S.eyeTries++;
     if (type === 'cup_tipped') S.cupsTipped++;
+    if (type === 'giant_crush') S.crushes++;
+    if (type === 'giant_impatient' && S.impatientAt == null) S.impatientAt = now;
     // breaking the paradigm: the first thing done to him or his table other than choosing a cup
     const offMenu = type === 'eye_reached' || type === 'cup_tipped' || type === 'giant_throw' || (type === 'grab' && /giant/.test(d.target || ''));
     if (offMenu && S.promptAt != null && S.breakAt == null) { S.breakAt = now; S.breakHow = { grab: `took hold of him (${d.target})`, eye_reached: 'went for his eye', cup_tipped: `knocked over the ${d.cup}`, giant_throw: 'tried to get round him' }[type]; }
@@ -235,7 +237,7 @@ export class Engine {
       livesUsed: LIVES_PER_RUN - this.lives + (won ? 1 : 0),
       deaths: S.deaths,
       falls: S.falls, grabs: S.grabs, refused: S.refused, snapped: S.snapped,
-      drank: S.drank, thrown: S.thrown, eyeTries: S.eyeTries, cupsTipped: S.cupsTipped,
+      drank: S.drank, thrown: S.thrown, eyeTries: S.eyeTries, cupsTipped: S.cupsTipped, crushes: S.crushes,
       rootsTried: { sound: S.rootsTried.sound.size, rotten: S.rootsTried.rotten.size, wet: S.rootsTried.wet.size },
     };
   }
@@ -348,7 +350,7 @@ export class Engine {
 function newStats() {
   return {
     tableAt: null, promptAt: null, breakAt: null, breakHow: null, killedAt: null, method: null,
-    deaths: [], falls: 0, grabs: 0, refused: 0, snapped: 0, drank: [], thrown: 0, eyeTries: 0, cupsTipped: 0,
+    deaths: [], falls: 0, grabs: 0, refused: 0, snapped: 0, drank: [], thrown: 0, eyeTries: 0, cupsTipped: 0, crushes: 0, impatientAt: null,
     rootsTried: { sound: new Set(), rotten: new Set(), wet: new Set() },
   };
 }
