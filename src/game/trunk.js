@@ -6,14 +6,41 @@ import * as THREE from 'three';
 import { addBox, addCapsule, addSphere } from './physics.js';
 
 // Profile of the fibre centre-line: half-extents of a rounded rectangle at each height.
-const PROFILE = [
-  { y: 0.0, hx: 2.15, hz: 1.42, cr: 0.75 },
-  { y: 0.45, hx: 1.95, hz: 1.2, cr: 0.68 },
-  { y: 1.1, hx: 1.68, hz: 0.95, cr: 0.55 },
-  { y: 1.8, hx: 1.86, hz: 1.08, cr: 0.55 },
-  { y: 2.45, hx: 2.08, hz: 1.22, cr: 0.48 },
+export const PROFILE = [
+  { y: 0.0, hx: 2.75, hz: 1.95, cr: 1.3 },
+  { y: 0.45, hx: 2.45, hz: 1.7, cr: 1.2 },
+  { y: 1.1, hx: 2.05, hz: 1.35, cr: 1.0 },
+  { y: 1.8, hx: 2.25, hz: 1.5, cr: 1.0 },
+  { y: 2.45, hx: 2.5, hz: 1.68, cr: 0.9 },
 ];
-const FIBRES = 50;
+export const FIBRE_R = [0.15, 0.12, 0.105, 0.11, 0.115];
+const FIBRES = 64;
+
+// Outer surface of the trunk (centre-line + fibre radius) on the ±x side at height y and depth z,
+// and on the ±z side at height y and position x. Used to hang the climb routes off the trunk.
+export function outerX(y, z) {
+  const p = profileAt(y), r = radiusAt(y);
+  const az = Math.abs(z), flat = p.hz - p.cr;
+  if (az <= flat) return p.hx + r;
+  const d = Math.min(p.cr, az - flat);
+  return p.hx - p.cr + Math.sqrt(p.cr * p.cr - d * d) + r;
+}
+export function outerZ(y, x) {
+  const p = profileAt(y), r = radiusAt(y);
+  const ax = Math.abs(x), flat = p.hx - p.cr;
+  if (ax <= flat) return p.hz + r;
+  const d = Math.min(p.cr, ax - flat);
+  return p.hz - p.cr + Math.sqrt(p.cr * p.cr - d * d) + r;
+}
+function radiusAt(y) {
+  for (let i = 0; i < PROFILE.length - 1; i++) {
+    if (y <= PROFILE[i + 1].y || i === PROFILE.length - 2) {
+      const k = Math.max(0, Math.min(1, (y - PROFILE[i].y) / (PROFILE[i + 1].y - PROFILE[i].y)));
+      return FIBRE_R[i] + (FIBRE_R[i + 1] - FIBRE_R[i]) * k;
+    }
+  }
+  return FIBRE_R[0];
+}
 
 function rng(seed) {
   let s = seed >>> 0;
@@ -89,12 +116,13 @@ export function taperedTube(points, radii, seed, radial = 8) {
   return g;
 }
 
-export function buildTrunk(world, batch, group, mats) {
+export function buildTrunk(world, batch, group, mats, routeSegs = []) {
   const R = rng(4242);
 
   // a dark core behind the fibres, sized to the waist so nothing can be reached through a gap
-  const coreBody = addBox(world, { x: 0, y: 1.225, z: 0 }, { x: 1.5, y: 1.225, z: 0.8 }, { label: 'trunk', kind: 'bark', grip: 'none' });
-  const core = new THREE.Mesh(new THREE.BoxGeometry(3.0, 2.45, 1.6), mats.barkDeep);
+  const coreBody = addBox(world, { x: 0, y: 1.225, z: 0 }, { x: 1.9, y: 1.225, z: 1.2 }, { label: 'trunk', kind: 'bark', grip: 'none' });
+  const core = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 2.45, 24), mats.barkDeep);
+  core.scale.set(1.9, 1, 1.2);
   core.position.y = 1.225;
   group.add(core);
 
@@ -102,12 +130,12 @@ export function buildTrunk(world, batch, group, mats) {
   for (let i = 0; i < FIBRES; i++) {
     const t0 = i / FIBRES + (R() - 0.5) * 0.004;
     const twist = (i % 2 ? 1 : -1) * (0.008 + R() * 0.01);
-    const out = (R() - 0.5) * 0.05;
+    const out = (R() - 0.5) * 0.08;
     const pts = PROFILE.map((p, k) => {
       const q = rrPoint(t0 + twist * k, p.hx + out, p.hz + out, p.cr);
       return { x: q.x, y: p.y + (k === 0 ? -0.04 : 0), z: q.z };
     });
-    const radii = [0.15, 0.12, 0.105, 0.11, 0.115].map((r) => r * (0.9 + R() * 0.2));
+    const radii = FIBRE_R.map((r) => r * (0.9 + R() * 0.2));
     for (let k = 0; k < pts.length - 1; k++) {
       addCapsule(world, pts[k], pts[k + 1], (radii[k] + radii[k + 1]) / 2, { label: 'trunk root', kind: 'bark', grip: 'none' });
     }
@@ -133,7 +161,7 @@ export function buildTrunk(world, batch, group, mats) {
   // dark masses on the four corners of the crown, roots spilling off them
   const corners = [[1, 1], [-1, 1], [1, -1], [-1, -1]];
   for (const [sx, sz] of corners) {
-    const c = { x: sx * 1.85, y: 2.38, z: sz * 1.0 };
+    const c = { x: sx * 2.2, y: 2.38, z: sz * 1.4 };
     addSphere(world, c, 0.28, { label: 'crown knot', kind: 'root', grip: 'all' });
     const lump = new THREE.Mesh(lumpySphere(0.33, 700 + sx * 3 + sz), mats.rootDark);
     lump.position.set(c.x, c.y, c.z);
@@ -148,10 +176,7 @@ export function buildTrunk(world, batch, group, mats) {
   for (const [sx, sz] of corners) for (let k = 0; k < 4; k++) hangers.push({ sx, sz, k });
   for (let i = 0; i < 6; i++) hangers.push({ side: i });
   // keep every hanging root at least 0.4 (horizontally) from the six climb routes
-  const ROUTE_SEGS = [
-    [[2.42, -0.85], [2.42, -0.85]], [[-2.42, 0.85], [-2.42, 0.85]], [[2.42, 1.55], [2.42, 1.55]],
-    [[-3.05, -1.25], [-2.36, -1.25]], [[-0.95, -1.5], [-0.55, -1.4]],
-  ];
+  const ROUTE_SEGS = routeSegs;
   const segDist = (p, [a, b]) => {
     const abx = b[0] - a[0], abz = b[1] - a[1], l2 = abx * abx + abz * abz;
     const t = l2 ? Math.max(0, Math.min(1, ((p.x - a[0]) * abx + (p.z - a[1]) * abz) / l2)) : 0;
@@ -162,13 +187,13 @@ export function buildTrunk(world, batch, group, mats) {
    for (let attempt = 0; attempt < 8; attempt++) {
     let base, dir;
     if (h.side === undefined) {
-      const a = Math.atan2(h.sz * 1.2, h.sx * 2.1) + (R() - 0.5) * 0.7;
-      base = { x: h.sx * 1.95 + Math.cos(a) * 0.15, y: 2.4 - R() * 0.15, z: h.sz * 1.1 + Math.sin(a) * 0.15 };
+      const a = Math.atan2(h.sz * 1.6, h.sx * 2.4) + (R() - 0.5) * 0.7;
+      base = { x: h.sx * 2.3 + Math.cos(a) * 0.15, y: 2.4 - R() * 0.15, z: h.sz * 1.5 + Math.sin(a) * 0.15 };
       dir = { x: Math.cos(a), z: Math.sin(a) };
     } else {
       // along the long sides, between the routes
       const xs = [-1.2, 0.0, 1.2][h.side % 3], sz = h.side < 3 ? 1 : -1;
-      base = { x: xs + (R() - 0.5) * 0.3, y: 2.42, z: sz * 1.22 };
+      base = { x: xs + (R() - 0.5) * 0.3, y: 2.42, z: sz * 1.7 };
       dir = { x: (R() - 0.5) * 0.4, z: sz };
     }
     const reach = 0.45 + R() * 0.55, drop = 0.6 + R() * 0.6;

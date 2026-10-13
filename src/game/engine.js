@@ -65,6 +65,8 @@ export class Engine {
     scene.add(this.mouse.root);
     this.player = new Player(this.world, this.mouse, log);
     this.giant = new Giant(this.world, scene, this.mats, log, (lines, secs) => this.notice(lines, secs));
+    this.shake = 0;
+    this.giant.onShake = (k) => { this.shake = Math.max(this.shake, k); };
 
     this.lives = LIVES_PER_RUN;
     this.runTime = 0;
@@ -100,10 +102,11 @@ export class Engine {
     this.onKeyDown = (e) => {
       if (Object.values(KEYS).flat().includes(e.code)) e.preventDefault();
       this.input.keys.add(e.code);
+      if (!e.repeat) this.giant.press(); // mashing while in the giant's eye (ignored otherwise)
     };
     this.onKeyUp = (e) => this.input.keys.delete(e.code);
     this.onBlur = () => this.input.keys.clear();
-    this.onDown = (e) => { this.drag = { x: e.clientX, y: e.clientY }; c.setPointerCapture?.(e.pointerId); };
+    this.onDown = (e) => { this.drag = { x: e.clientX, y: e.clientY }; c.setPointerCapture?.(e.pointerId); this.giant.press(); };
     this.onMove = (e) => {
       if (!this.drag) return;
       const dx = e.clientX - this.drag.x, dy = e.clientY - this.drag.y;
@@ -139,6 +142,9 @@ export class Engine {
       if (p.buttons[13]?.pressed) fwd = -1;
       if (p.buttons[14]?.pressed) right = -1;
       if (p.buttons[15]?.pressed) right = 1;
+      const anyBtn = p.buttons.some((b) => b?.pressed);
+      if (anyBtn && !this.padPrev) this.giant.press();
+      this.padPrev = anyBtn;
       jumpHeld ||= !!p.buttons[0]?.pressed;
       grabHeld ||= !!(p.buttons[7]?.pressed || p.buttons[6]?.pressed);
       sprint ||= !!p.buttons[10]?.pressed;
@@ -232,6 +238,13 @@ export class Engine {
     const cl = Math.cos(c.lift), sl = Math.sin(c.lift);
     this.camera.position.set(c.tx + Math.sin(c.yaw) * cl * c.dist, c.ty + 0.06 + sl * c.dist, c.tz + Math.cos(c.yaw) * cl * c.dist);
     this.camera.lookAt(c.tx, c.ty + 0.04, c.tz);
+    if (this.shake > 0.01) {
+      const k = this.shake * 0.035;
+      this.camera.position.x += (Math.random() - 0.5) * k;
+      this.camera.position.y += (Math.random() - 0.5) * k;
+      this.camera.rotation.z += (Math.random() - 0.5) * this.shake * 0.05;
+      this.shake *= Math.exp(-dt * 4);
+    }
     this.key.position.set(c.tx + 4, c.ty + 9, c.tz + 6);
     this.key.target.position.set(c.tx, c.ty, c.tz);
     this.backdrop.update(this.t, this.camera.position);

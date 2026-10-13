@@ -81,6 +81,7 @@ export class Player {
     this.t += dt;
     if (!this.alive) return;
     if (this.poisonT >= 0) return this.stepPoison(dt, hooks);
+    if (this.locked) { this.updateModel(dt, { fwd: 0, right: 0 }); this.writhe = 0; return; }
 
     const any = Math.abs(input.fwd) > 0.1 || Math.abs(input.right) > 0.1 || input.jump || input.grabPressed;
     if (any) { this.idleT = 0; this.idleLogged = false; } else {
@@ -154,7 +155,8 @@ export class Player {
     } else if (!this.wasGround) {
       const h = this.airMaxY - this.pos.y;
       if (h > FALL_LOG_HEIGHT) this.log('fall', { height: +h.toFixed(3), cause: this.fallCause || 'fell', onto: this.ground.label });
-      if (h >= DEATH_HEIGHT && this.ground.kind === 'ground') { this.die('fall', this.hooks); }
+      // onto the ground — including the roots lying on it
+      if (h >= DEATH_HEIGHT && (this.ground.kind === 'ground' || this.pos.y < 0.4)) { this.die('fall', this.hooks); }
       this.fallCause = null;
     }
     if (this.onGround) this.airMaxY = this.pos.y;
@@ -170,9 +172,16 @@ export class Player {
         const cp = closestPoint(b, this.pos);
         if (cp.dist >= this.R) continue;
         const depth = this.R - cp.dist;
-        this.pos = add(this.pos, scale(cp.normal, depth));
-        const vn = dot(this.vel, cp.normal);
-        if (vn < 0) this.vel = sub(this.vel, scale(cp.normal, vn));
+        if (cp.normal.y > 0.6) {
+          // something to stand on: rest on it rather than being pushed sideways off it, so
+          // narrow tops (a cup's rim, a root, an arm) can be stood and balanced on
+          this.pos = add(this.pos, v(0, depth / cp.normal.y, 0));
+          if (this.vel.y < 0) this.vel.y = 0;
+        } else {
+          this.pos = add(this.pos, scale(cp.normal, depth));
+          const vn = dot(this.vel, cp.normal);
+          if (vn < 0) this.vel = sub(this.vel, scale(cp.normal, vn));
+        }
         if (cp.normal.y > bestUp) { bestUp = cp.normal.y; this.onGround = true; this.ground = b; }
         this.touch(b, cp);
       }
@@ -305,6 +314,19 @@ export class Player {
         this.release('broke');
         this.fallCause = 'surface broke';
         return;
+      }
+    }
+    // over the top of a knot while still holding on: take the vine above it again
+    if (n.y > 0.7 && b.shape === 'sphere' && b.route && input.grabHeld) {
+      for (const o of bodiesNear(this.world, this.pos, GRAB_REACH)) {
+        if (o === b || o.route !== b.route || o.shape !== 'capsule' || o.grip !== 'all') continue;
+        const cpo = closestPoint(o, this.pos);
+        if (cpo.dist <= GRAB_REACH && cpo.normal.y < 0.7) {
+          this.lastGrip = { body: b, at: this.t };
+          this.grip = { body: o, since: this.t };
+          this.log('grab', { target: o.label, route: o.route, over: b.label });
+          return;
+        }
       }
     }
     // topped out: the contact normal points up

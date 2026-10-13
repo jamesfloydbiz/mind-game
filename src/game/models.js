@@ -88,6 +88,12 @@ export function buildGiant(mats) {
   const eye = new THREE.Object3D(); // the target of the leap that ends him
   eye.position.set(0, 0.78, 0.54);
   neck.add(eye);
+  const headMark = new THREE.Object3D(); // centre of the head collider
+  headMark.position.set(0, 0.62, 0.02);
+  neck.add(headMark);
+  const jawMark = new THREE.Object3D();
+  jawMark.position.set(0, 0.12, 0.18);
+  neck.add(jawMark);
   const eyeLight = new THREE.PointLight(0x66ff00, 0.12, 0.6, 2);
   eyeLight.position.set(0, 0.78, 0.7);
   neck.add(eyeLight);
@@ -161,7 +167,7 @@ export function buildGiant(mats) {
     pivot.add(hold);
     arms.push({ side: sx, pivot, fist, marks, hold });
   }
-  return { root, lean, neck, eye, arms, eyeLight };
+  return { root, lean, neck, eye, arms, eyeLight, headMark, jawMark };
 }
 
 function mergeAll(list) {
@@ -190,7 +196,7 @@ export const CUP = {
   bowlH: 0.2,
   rTop: 0.122,
   rBot: 0.075,
-  lipTube: 0.018,
+  lipTube: 0.024, // thicker than the MVP's 0.018 so the rim is something to stand on
   liquidY: 0.3, // drawn surface of what he poured in
 };
 
@@ -262,14 +268,24 @@ export function cupColliderSpec(x, y0, z) {
   const staves = [], beads = [];
   for (let i = 0; i < 10; i++) {
     const a = (i / 10) * Math.PI * 2;
-    const yTop = lipY + C.lipTube - 0.015 - 0.004; // just under the top of the lip
+    const yTop = lipY; // staves run up into the lip
     staves.push({
       a: { x: x + Math.cos(a) * rAt(C.bowlBottom) * S, y: y0 + C.bowlBottom * S, z: z + Math.sin(a) * rAt(C.bowlBottom) * S },
       b: { x: x + Math.cos(a) * rAt(yTop) * S, y: y0 + yTop * S, z: z + Math.sin(a) * rAt(yTop) * S },
       r: 0.015 * S,
     });
-    const ab = a + Math.PI / 10;
-    beads.push({ p: { x: x + Math.cos(ab) * C.rTop * S, y: y0 + lipY * S, z: z + Math.sin(ab) * C.rTop * S }, r: C.lipTube * S });
+  }
+  // the rolled lip as one continuous ring of 24 short capsules on the tube's centre circle:
+  // its top, outer edge and underside match the drawn lip exactly, so it can be gripped from
+  // outside, climbed over and stood on
+  const N = 24;
+  for (let i = 0; i < N; i++) {
+    const a1 = (i / N) * Math.PI * 2, a2 = ((i + 1) / N) * Math.PI * 2;
+    beads.push({
+      a: { x: x + Math.cos(a1) * C.rTop * S, y: y0 + lipY * S, z: z + Math.sin(a1) * C.rTop * S },
+      b: { x: x + Math.cos(a2) * C.rTop * S, y: y0 + lipY * S, z: z + Math.sin(a2) * C.rTop * S },
+      r: C.lipTube * S,
+    });
   }
   const floorHalfY = 0.035 * S;
   return {

@@ -56,3 +56,17 @@ T.st(); T.evs();
   collider of the same size (no invisible walls); hanging roots are grippable but stay above 1.3
   and at least 0.4 away from every route. The 40 distant roots are dropped (they read as pale
   spikes once fogged).
+- **Bigger table + trunk (James, 2026-10-13):** slab half (2.6, 1.75); trunk profile much wider and
+  rounder; routes are now hung off the trunk's real surface (`outerX`/`outerZ` in trunk.js) — A, B,
+  F are slanted vines from the trunk's foot to the slab edge; C and E keep their behaviour.
+- **Ground roots:** the brief's two fans plus ~70 more, densest between the spawn and the tree.
+  Big falls that land at ground level (including on these roots) kill.
+- **The table is already set:** cups (now at x ±0.42), cheese and loaf are there from the start.
+  The giant walks in when you reach the top, slams his hands down, and asks his question. He then
+  leans in until his face hangs low behind the cups.
+- **Cup lip:** thicker (0.024) and one continuous ring of capsules; narrow tops (lip, roots, arms)
+  can be stood and balanced on (contacts you stand on push straight up, not sideways).
+- **Killing the giant:** his head and jaw are solid and climbable. Reaching his eye puts you in it:
+  mash any key/button (18 presses) to finish him, with shaking and ichor; stop for 2.2s and he
+  shakes you off. Logged as eye_reached / eye_press / giant_shook_off / stage_complete.
+- **The question** sits on a pale backing so it reads over the giant.
