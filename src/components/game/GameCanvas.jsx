@@ -17,7 +17,8 @@ export default function GameCanvas({ playerName, runNumber, onRestart, onPout })
       runNumber,
       onHud: setHud,
       onNotice: (lines, secs) => setNotice((n) => ({ lines, secs, id: n.id + 1 })),
-      onGameOver: setOver,
+      onGameOver: (o) => setOver({ ...o, won: false }),
+      onWin: (o) => setTimeout(() => setOver({ ...o, won: true }), 2500),
     });
     engine.current = e;
     return () => e.dispose();
@@ -31,7 +32,7 @@ export default function GameCanvas({ playerName, runNumber, onRestart, onPout })
       <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at center, transparent 50%, rgba(18,22,16,.38) 100%)' }} />
       <Notice {...notice} />
       <Hud lives={hud.lives} runMs={hud.runMs} />
-      {over && <GameOverScreen runMs={over.runMs} onRestart={onRestart} onPout={pout} />}
+      {over && <GameOverScreen runMs={over.runMs} stats={over.stats} won={over.won} onRestart={onRestart} onPout={pout} />}
     </div>
   );
 }

@@ -19,7 +19,7 @@ const upsert = db.prepare(`INSERT INTO run_logs VALUES ($run_id,$life_index,$run
   duration_ms=excluded.duration_ms, fall_count=excluded.fall_count, grab_attempts=excluded.grab_attempts,
   grab_successes=excluded.grab_successes, events=excluded.events, updated_at=excluded.updated_at`);
 
-const STATUSES = new Set(['partial', 'life_end', 'table_reached', 'abandoned']);
+const STATUSES = new Set(['partial', 'life_end', 'table_reached', 'abandoned', 'giant_slain']);
 const CHARACTERS = new Set(['mouse', 'frog', 'beetle']);
 
 function password() { return process.env.LOGS_PASSWORD || ''; }

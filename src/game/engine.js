@@ -60,13 +60,17 @@ export class Engine {
     this.level = buildWorld(this.world, scene, this.mats);
 
     this.logger = new Logger({ playerName: opts.playerName, runNumber: opts.runNumber });
-    const log = (type, data, sample) => this.logger.event(type, data, sample);
+    // every event also feeds the run's measurements shown at the end
+    this.stats = newStats();
+    const log = (type, data, sample) => { if (!sample) this.observe(type, data || {}); this.logger.event(type, data, sample); };
     this.mouse = buildMouse(this.mats);
     scene.add(this.mouse.root);
     this.player = new Player(this.world, this.mouse, log);
     this.giant = new Giant(this.world, scene, this.mats, log, (lines, secs) => this.notice(lines, secs));
     this.shake = 0;
     this.giant.onShake = (k) => { this.shake = Math.max(this.shake, k); };
+    this.giant.onPoisonPlayer = (cup) => this.player.startPoison(cup, 'splashed');
+    this.giant.onSlain = (method) => this.onWin(method);
 
     this.lives = LIVES_PER_RUN;
     this.runTime = 0;
@@ -79,6 +83,8 @@ export class Engine {
       onTable: () => this.giant.start(),
       onPoison: () => this.notice([], 0),
       onDeath: (cause) => this.onDeath(cause),
+      onPushCup: (cup, dir) => this.giant.tipCup(cup, dir, 'pushed'),
+      onLandCup: (cup, dir) => this.giant.tipCup(cup, dir, 'landed on'),
     };
 
     // post: a soft bloom on the one strong colour (the glow), then tone mapping + sRGB
@@ -179,10 +185,60 @@ export class Engine {
     }
     this.over = true;
     try { localStorage.setItem('mg_last_run_ms', String(Math.round(this.runTime * 1000))); } catch {}
-    this.opts.onGameOver?.({ runMs: Math.round(this.runTime * 1000), cause });
+    this.opts.onGameOver?.({ runMs: Math.round(this.runTime * 1000), cause, stats: this.summary(false) });
   }
 
   hud() { this.opts.onHud?.({ lives: this.lives, runMs: Math.round(this.runTime * 1000) }); }
+
+  onWin(method) {
+    if (this.over) return;
+    this.over = true;
+    this.logger.endLife('giant_slain');
+    try { localStorage.setItem('mg_last_run_ms', String(Math.round(this.runTime * 1000))); } catch {}
+    this.opts.onWin?.({ runMs: Math.round(this.runTime * 1000), method, stats: this.summary(true) });
+  }
+
+  // what the run's events say, for the results screen
+  observe(type, d) {
+    const S = this.stats, now = this.runTime;
+    if (type === 'table_reached' && S.tableAt == null) S.tableAt = now;
+    if (type === 'choice_prompt' && S.promptAt == null) S.promptAt = now;
+    if (type === 'death') S.deaths.push(d.cause);
+    if (type === 'fall') S.falls++;
+    if (type === 'grab_attempt') { S.grabs++; if (!d.succeeded) S.refused++; }
+    if (type === 'break') S.snapped++;
+    if (type === 'poison' && d.how === 'drank') S.drank.push(d.cup);
+    if (type === 'route_attempt' && /^root \d+/.test(d.route)) {
+      const kind = this.level.roots.find((r) => r.route === d.route)?.kind;
+      if (kind) S.rootsTried[kind].add(d.route);
+    }
+    if (type === 'giant_throw') S.thrown++;
+    if (type === 'eye_reached') S.eyeTries++;
+    if (type === 'cup_tipped') S.cupsTipped++;
+    // breaking the paradigm: the first thing done to him or his table other than choosing a cup
+    const offMenu = type === 'eye_reached' || type === 'cup_tipped' || type === 'giant_throw' || (type === 'grab' && /giant/.test(d.target || ''));
+    if (offMenu && S.promptAt != null && S.breakAt == null) { S.breakAt = now; S.breakHow = { grab: `took hold of him (${d.target})`, eye_reached: 'went for his eye', cup_tipped: `knocked over the ${d.cup}`, giant_throw: 'tried to get round him' }[type]; }
+    if (type === 'stage_complete' && d.giant_slain && S.killedAt == null) { S.killedAt = now; S.method = d.method; }
+  }
+
+  summary(won) {
+    const S = this.stats;
+    return {
+      won,
+      runMs: Math.round(this.runTime * 1000),
+      tableMs: S.tableAt == null ? null : Math.round(S.tableAt * 1000),
+      promptMs: S.promptAt == null ? null : Math.round(S.promptAt * 1000),
+      breakMs: S.breakAt == null ? null : Math.round(S.breakAt * 1000),
+      breakHow: S.breakHow,
+      killedMs: S.killedAt == null ? null : Math.round(S.killedAt * 1000),
+      method: S.method,
+      livesUsed: LIVES_PER_RUN - this.lives + (won ? 1 : 0),
+      deaths: S.deaths,
+      falls: S.falls, grabs: S.grabs, refused: S.refused, snapped: S.snapped,
+      drank: S.drank, thrown: S.thrown, eyeTries: S.eyeTries, cupsTipped: S.cupsTipped,
+      rootsTried: { sound: S.rootsTried.sound.size, rotten: S.rootsTried.rotten.size, wet: S.rootsTried.wet.size },
+    };
+  }
 
   frame(now) {
     if (this.disposed) return;
@@ -287,6 +343,14 @@ export class Engine {
     this.renderer.dispose();
     if (window.game === this) window.game = null;
   }
+}
+
+function newStats() {
+  return {
+    tableAt: null, promptAt: null, breakAt: null, breakHow: null, killedAt: null, method: null,
+    deaths: [], falls: 0, grabs: 0, refused: 0, snapped: 0, drank: [], thrown: 0, eyeTries: 0, cupsTipped: 0,
+    rootsTried: { sound: new Set(), rotten: new Set(), wet: new Set() },
+  };
 }
 
 function angleDiff(a, b) {

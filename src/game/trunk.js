@@ -5,16 +5,17 @@
 // Every root you see is a collider of the same size: no invisible walls, no ghost geometry.
 import * as THREE from 'three';
 import { addBox, addCapsule, addSphere } from './physics.js';
-import { strandGeometry, SLAB } from './world.js';
+import { strandGeometry, slabEdge } from './world.js';
 import { TABLE_TOP_Y } from './constants.js';
 
 // centre-line ellipse of the roots at each height (before lobes); y in world units
+const H = 1.25; // trunk height follows the table (25% taller)
 export const PROFILE = [
   { y: 0.0, ax: 4.5, az: 3.4 },
-  { y: 0.7, ax: 3.9, az: 2.95 },
-  { y: 1.8, ax: 3.25, az: 2.45 },
-  { y: 2.95, ax: 3.6, az: 2.7 },
-  { y: 3.92, ax: 4.25, az: 3.0 },
+  { y: 0.7 * H, ax: 3.9, az: 3.0 },
+  { y: 1.8 * H, ax: 3.25, az: 2.6 },
+  { y: 2.95 * H, ax: 3.6, az: 2.85 },
+  { y: 3.92 * H, ax: 4.25, az: 3.1 },
 ];
 export const ROOT_R = [0.24, 0.2, 0.17, 0.18, 0.19];
 const ROOTS = 58;
@@ -26,7 +27,7 @@ function rng(seed) {
 
 // lobes: buttress bulges round the trunk so the outline is never a clean ellipse
 // (strong at the foot, fading toward the crown so every root's top clears the slab's edge)
-const lobe = (th, y) => 1 + (1 - 0.7 * Math.min(1, y / 3.92)) * (0.07 * Math.sin(3 * th + 0.6) + 0.05 * Math.sin(5 * th + 1.9 + y * 0.6) + 0.03 * Math.sin(9 * th + y));
+const lobe = (th, y) => 1 + (1 - 0.7 * Math.min(1, y / (3.92 * H))) * (0.07 * Math.sin(3 * th + 0.6) + 0.05 * Math.sin(5 * th + 1.9 + y * 0.6) + 0.03 * Math.sin(9 * th + y));
 
 function lerpProfile(y) {
   for (let i = 0; i < PROFILE.length - 1; i++) {
@@ -111,10 +112,10 @@ export function buildTrunk(world, batch, group, mats) {
   const synced = [];
 
   // a dark core behind the roots, sized inside the waist so nothing can be reached through a gap
-  const coreBody = addBox(world, { x: 0, y: 1.96, z: 0 }, { x: 2.15, y: 1.96, z: 1.6 }, { label: 'trunk', kind: 'bark', grip: 'none' });
-  const core = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 3.92, 32), mats.barkDeep);
-  core.scale.set(2.95, 1, 2.2);
-  core.position.y = 1.96;
+  const coreBody = addBox(world, { x: 0, y: 1.96 * H, z: 0 }, { x: 2.15, y: 1.96 * H, z: 1.7 }, { label: 'trunk', kind: 'bark', grip: 'none' });
+  const core = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 3.92 * H, 32), mats.barkDeep);
+  core.scale.set(2.95, 1, 2.3);
+  core.position.y = 1.96 * H;
   group.add(core);
 
   const kinds = kindsAround(R);
@@ -133,7 +134,7 @@ export function buildTrunk(world, batch, group, mats) {
     {
       const top = pts[pts.length - 1];
       const L = Math.hypot(top.x, top.z), dx = top.x / L, dz = top.z / L;
-      const t = Math.min(SLAB.hx / Math.max(1e-6, Math.abs(dx)), SLAB.hz / Math.max(1e-6, Math.abs(dz))) + radii[radii.length - 1] + 0.04;
+      const t = slabEdge(dx, dz) + radii[radii.length - 1] + 0.04;
       pts[pts.length - 1] = { x: dx * Math.max(t, L), y: TABLE_TOP_Y - 0.04, z: dz * Math.max(t, L) };
       const mid = pts[pts.length - 2];
       const ml = Math.hypot(mid.x, mid.z);
@@ -175,7 +176,7 @@ export function buildTrunk(world, batch, group, mats) {
   for (let i = 0; i < 90; i++) {
     const th = R() * Math.PI * 2;
     const twist = (R() < 0.5 ? 1 : -1) * (0.04 + R() * 0.06);
-    const y0 = R() * 0.8, y1 = 2.4 + R() * 1.4;
+    const y0 = R() * 0.8, y1 = (2.4 + R() * 1.4) * H;
     const pts = [];
     for (let k = 0; k <= 5; k++) {
       const y = y0 + (y1 - y0) * (k / 5);
@@ -190,15 +191,15 @@ export function buildTrunk(world, batch, group, mats) {
   for (let i = 0; i < 26; i++) {
     const th = (i / 26) * Math.PI * 2 + (R() - 0.5) * 0.2;
     // they start just outside the table's rim, so climbing one also leads up to the tabletop
-    const sp = surfacePoint(th, 3.9, 0);
+    const sp = surfacePoint(th, 3.9 * H, 0);
     const sl = Math.hypot(sp.x, sp.z);
     const dir = { x: sp.x / sl, z: sp.z / sl };
-    const edge = Math.min(SLAB.hx / Math.max(1e-6, Math.abs(dir.x)), SLAB.hz / Math.max(1e-6, Math.abs(dir.z))) + 0.16;
+    const edge = slabEdge(dir.x, dir.z) + 0.16;
     const base = { x: dir.x * edge, y: TABLE_TOP_Y - 0.12, z: dir.z * edge };
-    const reach = 0.6 + R() * 0.9, drop = 0.8 + R() * 1.0;
+    const reach = 0.6 + R() * 0.9, drop = 1.0 + R() * 1.3;
     const p1 = { x: base.x + dir.x * reach * 0.45, y: base.y + 0.08, z: base.z + dir.z * reach * 0.45 };
     const p2 = { x: base.x + dir.x * reach * 0.85, y: base.y - drop * 0.45, z: base.z + dir.z * reach * 0.85 };
-    const p3 = { x: base.x + dir.x * reach + (R() - 0.5) * 0.2, y: Math.max(2.1, base.y - drop), z: base.z + dir.z * reach + (R() - 0.5) * 0.2 };
+    const p3 = { x: base.x + dir.x * reach + (R() - 0.5) * 0.2, y: Math.max(2.6, base.y - drop), z: base.z + dir.z * reach + (R() - 0.5) * 0.2 };
     const pts = [base, p1, p2, p3];
     const radii = [0.11, 0.085, 0.055, 0.02];
     for (let k = 0; k < 3; k++) addCapsule(world, pts[k], pts[k + 1], Math.max(0.025, (radii[k] + radii[k + 1]) / 2), { label: 'hanging root', kind: 'root', grip: 'all' });

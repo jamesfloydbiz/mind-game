@@ -6,7 +6,11 @@ import { addBox, addCapsule, addSphere } from './physics.js';
 import { TABLE_TOP_Y, SPAWN, WORLD_SCALE as W } from './constants.js';
 import { buildTrunk, outerAlong, taperedTube } from './trunk.js';
 
-export const SLAB = { hx: 2.6 * W, hz: 1.75 * W, h: 0.25 * W };
+// the tabletop: an oval cut across the crown (James: not rectangular)
+export const SLAB = { ax: 4.6, az: 3.2, h: 0.25 * W };
+// distance from the centre to the slab's edge along unit direction (dx, dz)
+export function slabEdge(dx, dz) { return 1 / Math.hypot(dx / SLAB.ax, dz / SLAB.az); }
+export function onSlab(x, z, margin = 0) { return Math.hypot(x / (SLAB.ax - margin), z / (SLAB.az - margin)) <= 1; }
 const UP = new THREE.Vector3(0, 1, 0);
 
 function rng(seed) {
@@ -87,37 +91,40 @@ export function buildWorld(world, scene, mats) {
   // --- Trunk: an hourglass of braided, climbable roots (see trunk.js).
   const trunk = buildTrunk(world, batch, group, mats);
 
-  // --- Crown / apron and slab.
+  // --- Crown and the oval slab. The slab's collider is a row of strips whose ends follow the
+  // oval, wrapped in a rolled rim of root (drawn and solid), so the edge is round to the touch too.
   const slabY = TABLE_TOP_Y - SLAB.h / 2;
-  // the crown's heart, kept inside the roots so it never overhangs a climber
-  addBox(world, { x: 0, y: slabY - SLAB.h / 2 - 0.16 * W, z: 0 }, { x: 3.1, y: 0.16 * W, z: 2.05 }, { label: 'crown', kind: 'bark', grip: 'none' });
-  const slab = addBox(world, { x: 0, y: slabY, z: 0 }, { x: SLAB.hx, y: SLAB.h / 2, z: SLAB.hz }, { label: 'table top', kind: 'slab', meta: { tableTop: true } });
+  addBox(world, { x: 0, y: slabY - SLAB.h / 2 - 0.2, z: 0 }, { x: 3.1, y: 0.2, z: 2.2 }, { label: 'crown', kind: 'bark', grip: 'none' });
+  const STRIPS = 36;
+  let slab = null;
+  for (let i = 0; i < STRIPS; i++) {
+    const x0 = -SLAB.ax + (i / STRIPS) * 2 * SLAB.ax, x1 = x0 + (2 * SLAB.ax) / STRIPS;
+    const xi = Math.abs(x0) < Math.abs(x1) ? x0 : x1; // inner edge of the strip → widest point
+    const hz = SLAB.az * Math.sqrt(Math.max(0, 1 - (Math.abs(xi) > SLAB.ax ? 1 : (xi / SLAB.ax) ** 2)));
+    const b = addBox(world, { x: (x0 + x1) / 2, y: slabY, z: 0 }, { x: (x1 - x0) / 2, y: SLAB.h / 2, z: Math.max(0.05, hz - 0.02) }, { label: 'table top', kind: 'slab', meta: { tableTop: true } });
+    if (i === STRIPS / 2) slab = b;
+  }
   {
-    const top = new THREE.Mesh(new THREE.BoxGeometry(SLAB.hx * 2, SLAB.h, SLAB.hz * 2), [mats.slabEdge, mats.slabEdge, mats.slab, mats.slabEdge, mats.slabEdge, mats.slabEdge]);
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, SLAB.h, 72, 1), [mats.slabEdge, mats.slab, mats.slabEdge]);
+    top.scale.set(SLAB.ax, 1, SLAB.az);
     top.position.y = slabY;
     top.castShadow = top.receiveShadow = true;
     group.add(top);
-    const band = new THREE.Mesh(new THREE.BoxGeometry(SLAB.hx * 2 + 0.03, 0.06, SLAB.hz * 2 + 0.03), mats.rootDark);
-    band.position.y = TABLE_TOP_Y - 0.01;
-    group.add(band);
   }
-  // braided roots round the slab's rim (look only; inside the slab's edge)
-  for (let ring = 0; ring < 4; ring++) {
-    const y = TABLE_TOP_Y - SLAB.h + 0.06 + ring * 0.08;
-    const ex = SLAB.hx - 0.02 - ring * 0.01, ez = SLAB.hz - 0.02 - ring * 0.01;
-    const corners = [[-ex, -ez], [ex, -ez], [ex, ez], [-ex, ez]];
-    for (let k = 0; k < 4; k++) {
-      const [x1, z1] = corners[k], [x2, z2] = corners[(k + 1) % 4];
-      const steps = 9;
-      for (let s = 0; s < steps; s++) {
-        const t1 = s / steps, t2 = (s + 1) / steps;
-        const wob = (t) => 0.012 * Math.sin((t + ring) * 11);
-        batch.add('rootDark', strandGeometry(
-          { x: x1 + (x2 - x1) * t1, y: y + wob(t1), z: z1 + (z2 - z1) * t1 },
-          { x: x1 + (x2 - x1) * t2, y: y + wob(t2), z: z1 + (z2 - z1) * t2 },
-          0.045, 0.042, ring * 31 + k * 7 + s, 7));
-      }
+  // rolled rim
+  {
+    const N = 48, rimR = SLAB.h / 2 + 0.03;
+    const pts = [];
+    for (let i = 0; i <= N; i++) {
+      const a = (i / N) * Math.PI * 2 + 0.01;
+      const wob = 1 + 0.01 * Math.sin(a * 7);
+      pts.push({ x: Math.cos(a) * SLAB.ax * wob, y: slabY, z: Math.sin(a) * SLAB.az * wob });
     }
+    for (let i = 0; i < N; i++) addCapsule(world, pts[i], pts[i + 1], rimR, { label: 'table rim', kind: 'slab', meta: { tableTop: true } });
+    batch.add('rootDark', taperedTube(pts, pts.map(() => rimR), 77, 10));
+    // a second, thinner braid just under it
+    const pts2 = pts.map((p, i) => ({ x: p.x * 0.985, y: slabY - SLAB.h * 0.45 + 0.03 * Math.sin(i * 1.7), z: p.z * 0.985 }));
+    batch.add('root', taperedTube(pts2, pts2.map(() => rimR * 0.55), 78, 8));
   }
 
   // --- Loose debris near the trunk's foot: boxes that move only when pushed, plus stones.
@@ -191,7 +198,7 @@ export function buildWorld(world, scene, mats) {
   const crumbs = [];
   for (let i = 0; i < 9; i++) {
     const r = 0.012 + R() * 0.018;
-    crumbs.push(addSphere(world, { x: (R() - 0.5) * 6, y: TABLE_TOP_Y + r, z: 0.6 + (R() - 0.5) * 3 }, r, { dynamic: true, mass: 0.05, label: 'crumb', kind: 'crumb' }));
+    crumbs.push(addSphere(world, { x: (R() - 0.5) * 5, y: TABLE_TOP_Y + r, z: 0.8 + (R() - 0.5) * 2.4 }, r, { dynamic: true, mass: 0.05, label: 'crumb', kind: 'crumb' }));
   }
 
   batch.build(group, mats);

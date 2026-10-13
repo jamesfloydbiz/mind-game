@@ -14,10 +14,13 @@ export const SPRINT_MULTIPLIER = 1.85;
 export const COYOTE_TIME = 0.14;
 // James (2026-10-13): the tree, table, giant and cups are 1.6x the brief's size; the mouse is not.
 export const WORLD_SCALE = 1.6;
-export const TABLE_TOP_Y = 2.7 * WORLD_SCALE;
+export const TABLE_HEIGHT_X = 1.25; // James: the table is 25% taller again
+export const TABLE_TOP_Y = 2.7 * WORLD_SCALE * TABLE_HEIGHT_X;
+export const GIANT_SCALE = WORLD_SCALE * TABLE_HEIGHT_X; // the giant grows with the table
 // Brief had {3.2, 0.06, 2.4}; moved further out (James, 2026-10-13) so the tree is approached
 // out of the mist rather than started beside.
-export const SPAWN = { x: 7.8, y: 0.06, z: 6.2 };
+// opposite the table from the giant (he stands at -z)
+export const SPAWN = { x: 0, y: 0.06, z: 10.5 };
 export const LIVES_PER_RUN = 3;
 export const DEATH_HEIGHT = 0.9;
 export const FALL_LOG_HEIGHT = 0.45;

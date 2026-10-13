@@ -35,8 +35,9 @@ T.st(); T.evs();
 
 Changes James asked for on 2026-10-13, layered on the brief in `docs/BRIEF.md`:
 
-- **Scale:** tree, table, giant and cups are 1.6x the brief (`WORLD_SCALE`); the mouse and all its
-  movement numbers are unchanged. Table top is 4.32.
+- **Scale:** tree and cups are 1.6x the brief (`WORLD_SCALE`); the table is 25% taller again (top at
+  5.4) and oval, and the giant grows with it (2x). The mouse and its movement numbers are unchanged.
+- **Spawn:** opposite the table from the giant, facing the tree (0, 0.06, 10.5).
 - **The tree is the way up.** The six separate routes (vines, lattice, debris root) are gone. The
   trunk is an hourglass of 58 braided roots — round and lobed, flared foot, pinched waist, wide
   crown — and every root can be gripped and climbed. They look alike, and only some hold:
@@ -49,6 +50,15 @@ Changes James asked for on 2026-10-13, layered on the brief in `docs/BRIEF.md`:
 - **The table is already set:** cups, cheese and loaf are there from the start. Reaching the top
   brings the giant in; he slams his hands down, says "Make a choice, one is poison, one is
   paradise", then leans in until his eye hangs just above the table.
+- **Knocking a cup over:** push (E) while standing on a cup's rim, or land on a rim from 0.5+ up
+  (e.g. off his arm). It tips the way you push or were moving; the poison spills, and if it reaches
+  his hands, arms or face he convulses and dies (`method: poison`). Spill on yourself and you die too.
+- **Getting round him:** once he is at the table, going past the back of it (z < -(slab + 0.4)),
+  on the ground or along his arm, makes him grab you and throw you back to the start: "You must make
+  the choice on the table." (`giant_throw`)
+- **Results screen:** on game over and when the giant is down — time to the top, time the choice was
+  put, when and how the paradigm was broken (first grab of him, eye, cup tipped, or trying to get
+  round), how he died, drinks, throws, lives used, roots tried by kind, grabs/refusals/falls.
 - **Killing the giant:** reach his eye (a jump from the table in front of his face, or climbing his
   jaw/head, which are solid). You are then in it: mash any key/button 18 times to finish him (shake
   and ichor); stop for 2.2s and he shakes you off. He topples back and his body lies on the ground,

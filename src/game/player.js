@@ -8,6 +8,8 @@ import {
 } from './constants.js';
 import { closestPoint, bodiesNear, breakBody, wake, vec } from './physics.js';
 
+const CUP_TIP_FALL = 0.5; // landing on a cup from this high knocks it over
+
 const { v, sub, add, scale, dot, len } = vec;
 const cross = (a, b) => v(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
 const norm = (a) => { const l = len(a); return l > 1e-9 ? scale(a, 1 / l) : v(0, 0, 0); };
@@ -60,6 +62,15 @@ export class Player {
     this.climbLogT = 0;
     this.writhe = 0;
     this.t = 0;
+  }
+
+  startPoison(cup, how = 'drank') {
+    if (this.poisonT >= 0 || !this.alive) return;
+    this.release('poison');
+    this.locked = false;
+    this.poisonT = 0;
+    this.log('poison', { cup, how });
+    this.hooks && this.hooks.onPoison();
   }
 
   applyImpulse(dv) {
@@ -117,12 +128,7 @@ export class Player {
       hooks.onTable();
     }
     // poison
-    if (this.ground && this.ground.meta.cupInterior && this.poisonT < 0) {
-      this.release('poison');
-      this.poisonT = 0;
-      this.log('poison', { cup: this.ground.meta.cup });
-      hooks.onPoison();
-    }
+    if (this.ground && this.ground.meta.cupInterior && this.poisonT < 0) this.startPoison(this.ground.meta.cup);
 
     this.sampleT += dt;
     if (this.sampleT >= 0.1) { this.sampleT = 0; this.log('px', this.p3(), true); }
@@ -160,6 +166,11 @@ export class Player {
     } else if (!this.wasGround) {
       const h = this.airMaxY - this.pos.y;
       if (h > FALL_LOG_HEIGHT) this.log('fall', { height: +h.toFixed(3), cause: this.fallCause || 'fell', onto: this.ground.label });
+      // landing hard on a cup knocks it over the way you were going
+      if (h >= CUP_TIP_FALL && this.ground.kind === 'cup' && this.ground.meta.cup) {
+        const hv = Math.hypot(this.vel.x, this.vel.z);
+        this.hooks && this.hooks.onLandCup(this.ground.meta.cup, hv > 0.1 ? { x: this.vel.x, z: this.vel.z } : this.facing);
+      }
       // onto the ground — including the roots lying on it
       if (h >= DEATH_HEIGHT && (this.ground.kind === 'ground' || this.pos.y < 0.4)) { this.die('fall', this.hooks); }
       this.fallCause = null;
@@ -229,6 +240,12 @@ export class Player {
   }
 
   tryGrab(input, camF, camR, auto = false) {
+    // standing on a cup's rim: shove the cup itself
+    if (!auto && this.onGround && this.ground && this.ground.meta.lip) {
+      this.log('push', { target: this.ground.meta.cup, cup: true });
+      this.hooks && this.hooks.onPushCup(this.ground.meta.cup, this.facing);
+      return;
+    }
     const near = bodiesNear(this.world, this.pos, GRAB_REACH + 0.05);
     // 1) on the ground with a loose object in front: shove it
     if (this.onGround && !auto) {
