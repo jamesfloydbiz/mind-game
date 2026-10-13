@@ -1,6 +1,6 @@
 import { formatTime } from './formatTime.js';
 
-const CONTROLS = [['A / D', 'Move'], ['Space', 'Jump'], ['E', 'Grab / Push'], ['Shift', 'Sprint'], ['Drag', 'Look']];
+const CONTROLS = [['A / D', 'Move'], ['Space', 'Jump'], ['E', 'Grab / Push'], ['Shift', 'Sprint'], ['Drag', 'Look'], ['M', 'Sound']];
 
 export default function Hud({ lives, runMs }) {
   return (

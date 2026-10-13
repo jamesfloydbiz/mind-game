@@ -14,6 +14,8 @@ bun run dev        # http://localhost:4280
 ```
 
 - `/` — landing → game. `/logs` — researcher viewer (password = `LOGS_PASSWORD` in `.env`).
+- `/proctor` — session setup: make one participant code + link per student (`/?code=XXXX` fills in
+  and locks the code; no names are collected). Keep the code → student key offline.
 - `bun test` — physics unit tests.
 - `bun run build && bun run start` — production build served on :4281.
 
@@ -69,3 +71,12 @@ Changes James asked for on 2026-10-13, layered on the brief in `docs/BRIEF.md`:
   `LOGS_PASSWORD`). Load-in shrinks the canvas buffer instead of a 64x36 render target.
 - **Backdrop:** a painted sky dome until a Marble splat world is dropped in at
   `public/backdrops/world.spz`.
+- **Debrief:** the end screen reveals what was being tested (`src/game/debrief.js` — draft copy for
+  James to edit) and says when the player stepped outside the box.
+- **Watch-back:** every life in `/logs` has a replay — top-down path coloured by height, a height
+  strip with the table line, and grabs, refusals, snaps, deaths and moves against the giant marked
+  where and when they happened.
+- **Sound:** all synthesised (`src/game/sound.js`): wind, his footsteps out of the fog, the slam, his
+  voice (browser speech, pitched down), cracking roots, the cup, the spill, the eye, death. M mutes.
+- **Breaking the paradigm** is logged at the first: climbing onto him (not brushing him), reaching his
+  eye, knocking a cup over, or trying to get round him.

@@ -1,6 +1,6 @@
 import { formatTime } from '../game/formatTime.js';
 
-export default function LandingStatusBar({ name, setName, lastRun }) {
+export default function LandingStatusBar({ name, setName, lastRun, locked }) {
   return (
     <header className="mg-seq flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-ink/15 px-5 py-3 text-[11px] font-light mg-track">
       <span className="flex items-center gap-3">
@@ -8,8 +8,10 @@ export default function LandingStatusBar({ name, setName, lastRun }) {
         <span>Mind Game</span>
         <span className="text-ink/50">Level 03</span>
       </span>
+      {locked && <span className="text-ink/50">Participant</span>}
       <input
-        aria-label="Player name"
+        readOnly={locked}
+        aria-label={locked ? 'Participant code' : 'Player name'}
         value={name}
         onChange={(e) => setName(e.target.value.toUpperCase().slice(0, 18))}
         placeholder="YOUR NAME"

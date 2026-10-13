@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Replay from './Replay.jsx';
 
 const QUIET = new Set(['px', 'contact']);
 
@@ -29,6 +30,7 @@ export default function EventTimeline({ record, onClose }) {
         <button onClick={exportJson} className="bg-ink px-4 py-1.5 text-xs mg-track text-field hover:bg-cyan hover:text-ink">Export JSON</button>
         <button onClick={onClose} className="border border-ink/40 px-4 py-1.5 text-xs mg-track hover:border-cyan hover:text-cyan">Close</button>
       </div>
+      <Replay record={record} />
       <ol className="mt-5 space-y-1 font-mono text-[11px]">
         {events.map((e, i) => (
           <li key={i} className={`grid grid-cols-[5rem_10rem_1fr] gap-3 ${e.type === 'death' || e.type === 'poison' ? 'text-lred' : e.type.startsWith('giant') || e.type === 'table_reached' || e.type === 'stage_complete' ? 'text-[#1a8a99]' : ''}`}>

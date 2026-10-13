@@ -6,17 +6,20 @@ import EntryBlock from './EntryBlock.jsx';
 export default function LandingScreen() {
   const [name, setName] = useState('');
   const [lastRun, setLastRun] = useState(null);
+  // a proctor's link (?code=XXXX) fixes the participant code; no names are collected then
+  const [locked] = useState(() => (new URLSearchParams(window.location.search).get('code') || '').toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 12));
 
   // loaded after mount
   useEffect(() => {
     try {
-      setName(localStorage.getItem('mg_player_name') || '');
+      setName(locked || localStorage.getItem('mg_player_name') || '');
       const ms = localStorage.getItem('mg_last_run_ms');
       if (ms) setLastRun(Number(ms));
     } catch {}
   }, []);
 
   const updateName = (n) => {
+    if (locked) return;
     setName(n);
     try { localStorage.setItem('mg_player_name', n); } catch {}
   };
@@ -34,7 +37,7 @@ export default function LandingScreen() {
 
   return (
     <div className="mg-vignette min-h-full bg-field text-ink font-oswald uppercase">
-      <LandingStatusBar name={name} setName={updateName} lastRun={lastRun} />
+      <LandingStatusBar name={name} setName={updateName} lastRun={lastRun} locked={!!locked} />
       <main className="mx-auto max-w-3xl px-6 pb-24 pt-14 sm:pt-20">
         <div className="mg-seq flex items-center gap-5" style={{ animationDelay: '0.1s' }}>
           <div className="h-10 w-10 bg-ink sm:h-12 sm:w-12" />

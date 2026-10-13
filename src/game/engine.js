@@ -10,6 +10,7 @@ import { Logger } from './logger.js';
 import { loadInState } from './loadin.js';
 import { buildBackdrop } from './backdrop.js';
 import { installHeightFog } from './fog.js';
+import { Sound } from './sound.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -62,6 +63,8 @@ export class Engine {
     this.logger = new Logger({ playerName: opts.playerName, runNumber: opts.runNumber });
     // every event also feeds the run's measurements shown at the end
     this.stats = newStats();
+    this.sound = new Sound();
+    this.sound.resume();
     const log = (type, data, sample) => { if (!sample) this.observe(type, data || {}); this.logger.event(type, data, sample); };
     this.mouse = buildMouse(this.mats);
     scene.add(this.mouse.root);
@@ -109,6 +112,7 @@ export class Engine {
       if (Object.values(KEYS).flat().includes(e.code)) e.preventDefault();
       this.input.keys.add(e.code);
       if (!e.repeat) this.giant.press(); // mashing while in the giant's eye (ignored otherwise)
+      if (e.code === 'KeyM' && !e.repeat) this.opts.onMute?.(this.sound.toggle());
     };
     this.onKeyUp = (e) => this.input.keys.delete(e.code);
     this.onBlur = () => this.input.keys.clear();
@@ -198,8 +202,30 @@ export class Engine {
     this.opts.onWin?.({ runMs: Math.round(this.runTime * 1000), method, stats: this.summary(true) });
   }
 
+  sfx(type, d) {
+    const s = this.sound;
+    if (!s) return;
+    if (type === 'giant_slam') s.slam();
+    else if (type === 'choice_prompt') setTimeout(() => s.voice('Make a choice. One is poison. One is paradise.'), 500);
+    else if (type === 'giant_impatient') s.voice('Choose.');
+    else if (type === 'giant_crush') s.roar();
+    else if (type === 'giant_crush_result') s.slam();
+    else if (type === 'giant_throw') { s.roar(); s.whoosh(); setTimeout(() => s.voice('You must make the choice on the table.'), 1400); }
+    else if (type === 'break') s.crack();
+    else if (type === 'cup_tipped') s.clatter();
+    else if (type === 'cup_spilled') s.splash();
+    else if (type === 'giant_poisoned') { s.splash(); if (d.part === 'mouth') s.gulp(); setTimeout(() => s.roar(), 300); }
+    else if (type === 'eye_reached') { s.squelch(); s.roar(); }
+    else if (type === 'eye_press') s.squelch();
+    else if (type === 'giant_shook_off') s.roar();
+    else if (type === 'stage_complete' && d.stage === 'giant_down') s.slam();
+    else if (type === 'death') s.death();
+    else if (type === 'poison' && d.how === 'drank') s.gulp();
+  }
+
   // what the run's events say, for the results screen
   observe(type, d) {
+    this.sfx(type, d);
     const S = this.stats, now = this.runTime;
     if (type === 'table_reached' && S.tableAt == null) S.tableAt = now;
     if (type === 'choice_prompt' && S.promptAt == null) S.promptAt = now;
@@ -218,8 +244,9 @@ export class Engine {
     if (type === 'giant_crush') S.crushes++;
     if (type === 'giant_impatient' && S.impatientAt == null) S.impatientAt = now;
     // breaking the paradigm: the first thing done to him or his table other than choosing a cup
-    const offMenu = type === 'eye_reached' || type === 'cup_tipped' || type === 'giant_throw' || (type === 'grab' && /giant/.test(d.target || ''));
-    if (offMenu && S.promptAt != null && S.breakAt == null) { S.breakAt = now; S.breakHow = { grab: `took hold of him (${d.target})`, eye_reached: 'went for his eye', cup_tipped: `knocked over the ${d.cup}`, giant_throw: 'tried to get round him' }[type]; }
+    // (actually climbing on him counts; brushing against his arm with E held doesn't)
+    const offMenu = type === 'eye_reached' || type === 'cup_tipped' || type === 'giant_throw' || (type === 'climb' && /giant/.test(d.target || ''));
+    if (offMenu && S.promptAt != null && S.breakAt == null) { S.breakAt = now; S.breakHow = { climb: `climbed onto him (${(d.target || '').replace('giant ', 'his ')})`, eye_reached: 'went for his eye', cup_tipped: `knocked over the ${d.cup}`, giant_throw: 'tried to get round him' }[type]; }
     if (type === 'stage_complete' && d.giant_slain && S.killedAt == null) { S.killedAt = now; S.method = d.method; }
   }
 
@@ -267,6 +294,12 @@ export class Engine {
       this.giant.update(SUBSTEP, this.player);
     }
     if (li.done && !this.over && this.player.alive) this.runTime += dt;
+    // his footsteps, coming out of the fog
+    const gi = this.giant;
+    if (gi.state === 'arriving' && gi.t < 1.75) {
+      const step = Math.floor(gi.t * 2.36);
+      if (step !== this.lastStep) { this.lastStep = step; this.sound?.footstep(0.4 + gi.t * 0.35); }
+    }
     this.hudT = (this.hudT || 0) + dt;
     if (this.hudT > 0.25) { this.hudT = 0; this.hud(); }
     this.updateCamera(dt, input, li);
@@ -342,6 +375,7 @@ export class Engine {
     });
     for (const m of Object.values(this.mats)) { m.map?.dispose(); m.bumpMap?.dispose(); }
     this.composer.dispose();
+    this.sound?.dispose();
     this.renderer.dispose();
     if (window.game === this) window.game = null;
   }

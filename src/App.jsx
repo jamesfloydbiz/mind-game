@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import LandingScreen from './components/landing/LandingScreen.jsx';
 import GameCanvas from './components/game/GameCanvas.jsx';
 import LogsPage from './components/run-log/LogsPage.jsx';
+import ProctorPage from './components/proctor/ProctorPage.jsx';
 
 // Routes: "/" = landing → game (mounted on the "mindgame:start" event), "/logs" = researcher viewer.
 export default function App() {
@@ -15,6 +16,7 @@ export default function App() {
   }, []);
 
   if (path.startsWith('/logs')) return <LogsPage />;
+  if (path.startsWith('/proctor')) return <ProctorPage />;
   if (game) {
     return (
       <GameCanvas
