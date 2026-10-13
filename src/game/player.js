@@ -50,6 +50,7 @@ export class Player {
     this.facing = v(-0.6, 0, -0.8);
     this.yaw = Math.atan2(this.facing.x, this.facing.z);
     this.alive = true;
+    this.locked = false; // a new life is never still held by the giant
     this.poisonT = -1;
     this.stepPhase = 0;
     this.idleT = 0;
