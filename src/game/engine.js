@@ -9,6 +9,11 @@ import { Giant } from './giant.js';
 import { Logger } from './logger.js';
 import { loadInState } from './loadin.js';
 import { buildBackdrop } from './backdrop.js';
+import { buildMist } from './mist.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { FOG_COLOR, FOG_DENSITY, LIVES_PER_RUN, SUBSTEP } from './constants.js';
 
 const KEYS = {
@@ -49,6 +54,7 @@ export class Engine {
     this.mats = materials();
     this.backdrop = buildBackdrop(scene);
     this.backdrop.tryMarble();
+    this.mist = buildMist(scene);
 
     this.world = createWorld();
     this.level = buildWorld(this.world, scene, this.mats);
@@ -72,6 +78,13 @@ export class Engine {
       onPoison: () => this.notice([], 0),
       onDeath: (cause) => this.onDeath(cause),
     };
+
+    // post: a soft bloom on the one strong colour (the glow), then tone mapping + sRGB
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.addPass(new RenderPass(scene, this.camera));
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.45, 0.6, 0.82);
+    this.composer.addPass(this.bloom);
+    this.composer.addPass(new OutputPass());
 
     this.bindInput();
     this.resize();
@@ -144,6 +157,7 @@ export class Engine {
     const w = this.canvas.clientWidth || window.innerWidth, h = this.canvas.clientHeight || window.innerHeight;
     this.W = w; this.H = h;
     this.renderer.setSize(w, h, false);
+    this.composer?.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   }
@@ -231,9 +245,12 @@ export class Engine {
     if (Math.abs(ratio - this.renderer.getPixelRatio()) > 1e-3) {
       this.renderer.setPixelRatio(ratio);
       this.renderer.setSize(this.W, this.H, false);
+      this.composer.setPixelRatio(ratio);
+      this.composer.setSize(this.W, this.H);
     }
     this.canvas.style.imageRendering = li.done ? 'auto' : 'pixelated';
-    this.renderer.render(this.scene, this.camera);
+    this.mist.update(this.t);
+    this.composer.render();
   }
 
   // For tests / tools: render a frame now.
@@ -254,6 +271,8 @@ export class Engine {
       if (o.geometry) o.geometry.dispose();
     });
     for (const m of Object.values(this.mats)) { m.map?.dispose(); m.bumpMap?.dispose(); }
+    this.mist.dispose();
+    this.composer.dispose();
     this.renderer.dispose();
     if (window.game === this) window.game = null;
   }

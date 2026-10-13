@@ -22,6 +22,7 @@ function canvasTex(size, draw, repeat = 1) {
 
 function bumpFrom(tex) {
   const b = tex.clone();
+  b.repeat.copy(tex.repeat);
   b.colorSpace = THREE.NoColorSpace;
   b.needsUpdate = true;
   return b;
@@ -57,7 +58,7 @@ function textures() {
       g.fillRect(r() * n, r() * n, s, s);
     }
     for (let i = 0; i < 140; i++) {
-      g.fillStyle = `rgba(30,34,26,${0.1 + r() * 0.25})`;
+      g.fillStyle = `rgba(30,34,26,${0.04 + r() * 0.08})`;
       g.beginPath(); g.arc(r() * n, r() * n, 4 + r() * 22, 0, Math.PI * 2); g.fill();
     }
   }, 40);
@@ -85,6 +86,7 @@ function textures() {
       g.beginPath(); g.ellipse(n / 2, n / 2, k * 9 + r() * 4, k * 6 + r() * 3, 0, 0, Math.PI * 2); g.stroke();
     }
   }, 1);
+  tex.slab.repeat.set(2.2, 1.4);
   tex.wood = canvasTex(256, (g, n) => {
     const r = rng(31);
     g.fillStyle = '#5a5546'; g.fillRect(0, 0, n, n);
@@ -132,7 +134,7 @@ export function materials() {
   const t = textures();
   return {
     ground: std('ground', { map: t.ground, bumpMap: bumpFrom(t.ground), bumpScale: 1.5, color: 0x8a9480, roughness: 1 }),
-    slab: std('slab', { map: t.slab, bumpMap: bumpFrom(t.slab), bumpScale: 2, color: 0x8a8a80, roughness: 0.95 }),
+    slab: std('slab', { map: t.slab, bumpMap: bumpFrom(t.slab), bumpScale: 3, color: 0xb3b6a6, roughness: 0.9 }),
     slabEdge: std('slabEdge', { map: t.bark, color: 0x6f7462, roughness: 0.95 }),
     barkDeep: std('barkDeep', { map: t.bark, bumpMap: bumpFrom(t.bark), bumpScale: 3, color: 0x5f6656, roughness: 1 }),
     root: std('root', { map: t.bark, bumpMap: bumpFrom(t.bark), bumpScale: 2.5, color: 0x6c7461, roughness: 0.96 }),
@@ -145,11 +147,11 @@ export function materials() {
     hideDark: std('hideDark', { map: t.hide, color: 0x7d806f, roughness: 0.9 }),
     socket: std('socket', { color: 0x1a1c16, roughness: 1 }),
     liquid: std('liquid', { color: 0x0d120a, roughness: 0.15, metalness: 0.2 }),
-    glow: std('glow', { color: GLOW, emissive: GLOW, emissiveIntensity: 2.2, roughness: 0.4 }),
-    eye: std('eye', { color: GLOW, emissive: GLOW, emissiveIntensity: 3, roughness: 0.3 }),
+    glow: std('glow', { color: GLOW, emissive: GLOW, emissiveIntensity: 1.8, roughness: 0.4 }),
+    eye: std('eye', { color: GLOW, emissive: GLOW, emissiveIntensity: 1.6, roughness: 0.3 }),
     net: std('net', { color: 0x1d1f19, roughness: 1 }),
     goblet: std('goblet', { color: 0x5a3f3a, roughness: 0.55, metalness: 0.15 }),
-    cheese: std('cheese', { color: 0xd8b860, roughness: 0.75 }),
+    cheese: std('cheese', { color: 0xd8b860, roughness: 0.75, side: THREE.DoubleSide }),
     loaf: std('loaf', { color: 0x8a5a3a, roughness: 0.9 }),
     fur: std('fur', { color: 0x8b6a52, roughness: 1 }),
     furLight: std('furLight', { color: 0xc49a82, roughness: 1 }),

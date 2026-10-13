@@ -88,7 +88,7 @@ export function buildGiant(mats) {
   const eye = new THREE.Object3D(); // the target of the leap that ends him
   eye.position.set(0, 0.78, 0.54);
   neck.add(eye);
-  const eyeLight = new THREE.PointLight(0x66ff00, 0.6, 1.2, 2);
+  const eyeLight = new THREE.PointLight(0x66ff00, 0.12, 0.6, 2);
   eyeLight.position.set(0, 0.78, 0.7);
   neck.add(eyeLight);
 
@@ -227,7 +227,7 @@ export function buildCup(mats) {
   const band = mesh(new THREE.CylinderGeometry(rAt(C.liquidY) - 0.004, rAt(C.liquidY) - 0.004, 0.006, 32), mats.glow, false);
   band.position.y = C.liquidY + 0.004;
   inner.add(band);
-  const light = new THREE.PointLight(0x66ff00, 0.9, 0.9, 2);
+  const light = new THREE.PointLight(0x66ff00, 0.35, 0.55, 2);
   light.position.y = C.liquidY + 0.05;
   inner.add(light);
   // a net of three rings and six strands over the mouth (and draped down the bowl)

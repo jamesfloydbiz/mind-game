@@ -28,6 +28,7 @@ export default function GameCanvas({ playerName, runNumber, onRestart, onPout })
   return (
     <div className="fixed inset-0 overflow-hidden bg-field font-oswald uppercase">
       <canvas ref={canvas} className="block h-full w-full touch-none select-none" />
+      <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(ellipse at center, transparent 50%, rgba(18,22,16,.38) 100%)' }} />
       <Notice {...notice} />
       <Hud lives={hud.lives} runMs={hud.runMs} />
       {over && <GameOverScreen runMs={over.runMs} onRestart={onRestart} onPout={pout} />}
