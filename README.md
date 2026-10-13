@@ -33,40 +33,30 @@ T.st(); T.evs();
 
 ## Differences from the brief
 
-- **Backend:** a local Bun server + SQLite replaces Base44 entities/auth. Create is open; reading
-  `/api/runlog` needs `LOGS_PASSWORD`. No TanStack Start.
-- **Load-in:** the canvas drawing buffer is shrunk and upscaled with `image-rendering: pixelated`
-  instead of a 64×36 render target + blit quad. Same look; tone mapping and sRGB stay correct.
-- **Routes D and E** have no coordinates in the brief. D (dead-end lattice) sits on the +z face at
-  x 0.65–1.55; E (debris) sits off the −z face, under a hanging root whose lowest point is just out of
-  reach from the ground — push a box under it.
-- **Route C** is grippable only from below: jump up underneath it from the trunk side and grab.
-- **Climbing hand-over:** when a climb runs into another grippable surface (stem → bowl → lip,
-  vine → knot), the grip transfers to it.
-- **The giant leans in** a little when the animal is up by his cups, so the leap to his eye is
-  possible from a rim with a running jump.
-- **Backdrop:** a painted sky dome with layered misty hills until a World Labs Marble splat world is
-  dropped in at `public/backdrops/world.spz` (rendered with Spark).
-- **Fog:** keeps FOG_COLOR/FOG_DENSITY but is evaluated as height fog (thick, patchy mist low on the
-  ground, thinning with height) instead of uniform FogExp2. No mist billboards.
-- **Spawn:** moved from (3.2, 0.06, 2.4) to (5.4, 0.06, 4.1) so the tree is approached out of the mist.
-- **Trunk:** the brief's solid box + stilt-root poles read as a building, so the trunk is now an
-  hourglass of 50 braided root fibres (flared foot, pinched waist, wide crown) matched to James's
-  film reference, with corner knots and roots hanging off the crown. Every fibre is a slick
-  collider of the same size (no invisible walls); hanging roots are grippable but stay above 1.3
-  and at least 0.4 away from every route. The 40 distant roots are dropped (they read as pale
-  spikes once fogged).
-- **Bigger table + trunk (James, 2026-10-13):** slab half (2.6, 1.75); trunk profile much wider and
-  rounder; routes are now hung off the trunk's real surface (`outerX`/`outerZ` in trunk.js) — A, B,
-  F are slanted vines from the trunk's foot to the slab edge; C and E keep their behaviour.
-- **Ground roots:** the brief's two fans plus ~70 more, densest between the spawn and the tree.
-  Big falls that land at ground level (including on these roots) kill.
-- **The table is already set:** cups (now at x ±0.42), cheese and loaf are there from the start.
-  The giant walks in when you reach the top, slams his hands down, and asks his question. He then
-  leans in until his face hangs low behind the cups.
-- **Cup lip:** thicker (0.024) and one continuous ring of capsules; narrow tops (lip, roots, arms)
-  can be stood and balanced on (contacts you stand on push straight up, not sideways).
-- **Killing the giant:** his head and jaw are solid and climbable. Reaching his eye puts you in it:
-  mash any key/button (18 presses) to finish him, with shaking and ichor; stop for 2.2s and he
-  shakes you off. Logged as eye_reached / eye_press / giant_shook_off / stage_complete.
-- **The question** sits on a pale backing so it reads over the giant.
+Changes James asked for on 2026-10-13, layered on the brief in `docs/BRIEF.md`:
+
+- **Scale:** tree, table, giant and cups are 1.6x the brief (`WORLD_SCALE`); the mouse and all its
+  movement numbers are unchanged. Table top is 4.32.
+- **The tree is the way up.** The six separate routes (vines, lattice, debris root) are gone. The
+  trunk is an hourglass of 58 braided roots — round and lobed, flared foot, pinched waist, wide
+  crown — and every root can be gripped and climbed. They look alike, and only some hold:
+  `sound` (reach the table), `rotten` (snap after a second or two of weight), `wet` (slick above
+  the waist, faint sheen). Root tops curl out round the table's rim, so a sound root leads onto it.
+  Climbing into a neighbouring root hands the grip over; holding E keeps you climbing.
+  Every root is a collider of the size drawn (no invisible walls).
+- **Ground roots:** ~190, curving, arching up and dipping under the soil, densest between the spawn
+  and the tree. All climbable. Big falls that land at ground level (on roots too) kill.
+- **The table is already set:** cups, cheese and loaf are there from the start. Reaching the top
+  brings the giant in; he slams his hands down, says "Make a choice, one is poison, one is
+  paradise", then leans in until his eye hangs just above the table.
+- **Killing the giant:** reach his eye (a jump from the table in front of his face, or climbing his
+  jaw/head, which are solid). You are then in it: mash any key/button 18 times to finish him (shake
+  and ichor); stop for 2.2s and he shakes you off. He topples back and his body lies on the ground,
+  solid and walkable.
+- **Cup lip:** thicker, one continuous ring; narrow tops can be stood and balanced on.
+- **Look:** height fog (thick low mist, thinner higher up) instead of uniform FogExp2; spawn moved
+  out to (7.8, 0.06, 6.2); the brief's 40 distant roots are dropped (they read as pale spikes).
+- **Backend:** a local Bun server + SQLite replaces Base44 entities/auth (`/logs` needs
+  `LOGS_PASSWORD`). Load-in shrinks the canvas buffer instead of a 64x36 render target.
+- **Backdrop:** a painted sky dome until a Marble splat world is dropped in at
+  `public/backdrops/world.spz`.

@@ -45,7 +45,7 @@ export function installHeightFog() {
   #ifdef FOG_EXP2
     float mgGround = exp(-max(vFogWorld.y, 0.0) * 3.2);
     float mgPatch = 0.6 + 0.8 * mgNoise(vFogWorld.xz * 0.45) * mgNoise(vFogWorld.xz * 1.3 + 7.0);
-    float mgDensity = fogDensity * (0.2 + 0.85 * mgGround * mgPatch);
+    float mgDensity = fogDensity * (0.13 + 0.8 * mgGround * mgPatch);
     float fogFactor = 1.0 - exp(- mgDensity * mgDensity * vFogDepth * vFogDepth);
   #else
     float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);

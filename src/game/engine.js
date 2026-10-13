@@ -42,10 +42,10 @@ export class Engine {
     const hemi = new THREE.HemisphereLight(0xe9efe6, 0x4a5240, 1.15);
     scene.add(hemi);
     const key = (this.key = new THREE.DirectionalLight(0xf3f1e6, 2.1));
-    key.position.set(4, 9, 6);
+    key.position.set(6, 14, 9);
     key.castShadow = true;
     key.shadow.mapSize.set(2048, 2048);
-    Object.assign(key.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6, near: 1, far: 30 });
+    Object.assign(key.shadow.camera, { left: -11, right: 11, top: 11, bottom: -11, near: 1, far: 40 });
     key.shadow.bias = -0.0004;
     key.shadow.normalBias = 0.02;
     scene.add(key);
@@ -245,7 +245,7 @@ export class Engine {
       this.camera.rotation.z += (Math.random() - 0.5) * this.shake * 0.05;
       this.shake *= Math.exp(-dt * 4);
     }
-    this.key.position.set(c.tx + 4, c.ty + 9, c.tz + 6);
+    this.key.position.set(c.tx + 6, c.ty + 14, c.tz + 9);
     this.key.target.position.set(c.tx, c.ty, c.tz);
     this.backdrop.update(this.t, this.camera.position);
   }

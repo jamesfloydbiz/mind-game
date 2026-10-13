@@ -93,6 +93,11 @@ export class Player {
     const camR = v(Math.cos(input.camYaw), 0, -Math.sin(input.camYaw));
 
     if (input.grabPressed) this.tryGrab(input, camF, camR);
+    // holding E keeps you climbing: walking into a climbable surface takes hold of it again
+    else if (input.grabHeld && !this.grip && this.t - (this.autoGrabT || 0) > 0.25 && (Math.abs(input.fwd) > 0.1 || Math.abs(input.right) > 0.1)) {
+      this.autoGrabT = this.t;
+      this.tryGrab(input, camF, camR, true);
+    }
     if (this.grip && !input.grabHeld) this.release('released');
 
     if (this.grip) this.stepClimb(dt, input, camF, camR);
@@ -223,10 +228,10 @@ export class Player {
     this.route = null;
   }
 
-  tryGrab(input, camF, camR) {
+  tryGrab(input, camF, camR, auto = false) {
     const near = bodiesNear(this.world, this.pos, GRAB_REACH + 0.05);
     // 1) on the ground with a loose object in front: shove it
-    if (this.onGround) {
+    if (this.onGround && !auto) {
       let best = null;
       for (const b of near) {
         if (!b.dynamic || b === this.ground) continue;
@@ -253,12 +258,14 @@ export class Player {
       if (cp.dist > GRAB_REACH) continue;
       if (b === this.ground && cp.normal.y > 0.6) continue;
       if (b.kind === 'ground') continue;
+      if (auto && (cp.normal.y > 0.6 || dot(v(-cp.normal.x, 0, -cp.normal.z), this.facing) < 0.3)) continue;
       if (!best || cp.dist < best.cp.dist) best = { b, cp };
     }
     if (!best) {
-      this.log('grab_attempt', { target: null, surface: null, succeeded: false });
+      if (!auto) this.log('grab_attempt', { target: null, surface: null, succeeded: false });
       return;
     }
+    if (auto && best.b.grip === 'none') return;
     const { b, cp } = best;
     let ok = b.grip === 'all';
     if (b.grip === 'underside') ok = isUnderside(b, this.pos, cp);
@@ -317,7 +324,7 @@ export class Player {
       }
     }
     // over the top of a knot while still holding on: take the vine above it again
-    if (n.y > 0.7 && b.shape === 'sphere' && b.route && input.grabHeld) {
+    if (n.y > 0.85 && b.shape === 'sphere' && b.route && input.grabHeld) {
       for (const o of bodiesNear(this.world, this.pos, GRAB_REACH)) {
         if (o === b || o.route !== b.route || o.shape !== 'capsule' || o.grip !== 'all') continue;
         const cpo = closestPoint(o, this.pos);
@@ -329,8 +336,8 @@ export class Player {
         }
       }
     }
-    // topped out: the contact normal points up
-    if (n.y > 0.7) {
+    // topped out: the contact normal points (nearly) straight up
+    if (n.y > 0.85) {
       this.release('topped out');
       this.onGround = true;
       this.ground = b;
