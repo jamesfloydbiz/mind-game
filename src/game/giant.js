@@ -9,7 +9,7 @@
 // Trying to get past him — round behind the table, or along his arm to his shoulder — and he
 // grabs you and throws you back to the start: "You must make the choice on the table."
 import * as THREE from 'three';
-import { addBox, addCapsule, addSphere, placeBody, impulseFrom } from './physics.js';
+import { addBox, addCapsule, addSphere, placeBody, impulseFrom, closestPoint } from './physics.js';
 import { buildGiant, buildCup, buildCheese, buildLoaf, cupColliderSpec, CUP } from './models.js';
 import { LEAN, HEAD_TILT, ARM_PULL, ARM_DOWN, SLAM_STRENGTH, EYE_HIT_RADIUS, TABLE_TOP_Y, GIANT_SCALE as GS, WORLD_SCALE as WS, CUP_S, SPAWN } from './constants.js';
 import { SLAB, onSlab } from './world.js';
@@ -27,8 +27,10 @@ export const BURROW_GRACE = 2.2; // seconds without a press before he shakes you
 const LEAN_IN_MAX = 0.9; // most he will lean in over the table
 const BEHIND = -(SLAB.az + 0.4); // past this z you are getting round him
 const CUP_TIP_FALL = 0.5; // landing on a rim from this high knocks the cup over
-const THROW_TIME = 2.4; // seconds in the air when he throws you back
-const THROW_HEIGHT = 9; // how high the arc goes
+const GRAB_TIME = 1.5; // he takes hold of you, lifts you and shakes you before the throw
+const THROW_TIME = 3.0; // seconds in the air when he throws you back
+const THROW_HEIGHT = 13.5; // how high the arc goes
+const THROW_PAST = 2.0; // you land this far beyond the start
 const FOG_EDGE = -5.0; // run this far into the fog on his side before he has come and he comes for you
 const PATIENCE_WARN = 18; // seconds on his table without choosing before he says "Choose."
 const PATIENCE_CRUSH = 28; // ...and before he brings his fist down on you
@@ -298,11 +300,14 @@ export class Giant {
   // out of the fog: he leans down, his hand comes up from the ground and flings you away
   updateLurk(t) {
     const m = this.model;
-    const k = ease(seg(t, 0, 0.4));
+    // slowly: he leans out of the fog, his hand comes up and closes, then flings
+    const k = ease(seg(t, 0, 0.9));
     m.lean.rotation.x = 0.55 * k;
     m.neck.rotation.x = HEAD_TILT;
-    m.arms.forEach((a, i) => { a.pivot.rotation.x = i ? -0.4 - 1.6 * ease(seg(t, 0.15, 0.6)) : 0.1; a.pivot.rotation.z = 0; });
-    if (t > 1.2) m.root.position.z -= 0.02; // back into the fog
+    const reach = ease(seg(t, 0.2, GRAB_TIME));
+    const fling = ease(seg(t, GRAB_TIME, GRAB_TIME + 0.4));
+    m.arms.forEach((a, i) => { a.pivot.rotation.x = i ? -0.4 - 0.9 * reach - 1.2 * fling : 0.1; a.pivot.rotation.z = 0; });
+    if (t > GRAB_TIME + 1.0) m.root.position.z -= 0.02; // back into the fog
   }
 
   hideAway() {
@@ -317,13 +322,23 @@ export class Giant {
   updateThrow(dt, player) {
     const th = this.throwing;
     th.t += dt;
-    const k = ease(seg(th.t, 0, THROW_TIME));
-    const f = th.from, to = SPAWN;
-    player.pos = { x: f.x + (to.x - f.x) * k, y: f.y + (to.y - f.y) * k + Math.sin(Math.PI * k) * THROW_HEIGHT, z: f.z + (to.z - f.z) * k };
+    const f = th.from, to = { x: SPAWN.x, y: SPAWN.y, z: SPAWN.z + THROW_PAST };
+    if (th.t < GRAB_TIME) {
+      // held: lifted off your feet and shaken
+      const k = ease(seg(th.t, 0, GRAB_TIME));
+      const shake = seg(th.t, 0.3, GRAB_TIME) * 0.06;
+      player.pos = { x: f.x + Math.sin(th.t * 31) * shake, y: f.y + k * 0.9, z: f.z + Math.cos(th.t * 27) * shake };
+      th.held = { ...player.pos };
+    } else {
+      const k = ease(seg(th.t, GRAB_TIME, GRAB_TIME + THROW_TIME));
+      const h = th.held;
+      player.pos = { x: h.x + (to.x - h.x) * k, y: h.y + (to.y - h.y) * k + Math.sin(Math.PI * k) * THROW_HEIGHT, z: h.z + (to.z - h.z) * k };
+      if (!th.flung) { th.flung = true; this.onShake && this.onShake(1.0); this.onFling && this.onFling(); }
+    }
     player.vel = { x: 0, y: 0, z: 0 };
     // the hand that threw you, if he came out of the fog for it, goes back into it
     if (this.lurking) this.updateLurk(th.t);
-    if (th.t >= THROW_TIME) {
+    if (th.t >= GRAB_TIME + THROW_TIME) {
       this.throwing = null;
       if (this.lurking) { this.lurking = false; if (this.state === 'away') this.hideAway(); }
       player.locked = false;
@@ -693,6 +708,28 @@ export class Giant {
         chain[i + 1].getWorldPosition(w2);
         c.parked = false;
         placeBody(c, null, w, w2);
+      });
+    }
+    // a hand or arm coming down on the animal shoves it aside rather than pressing it into the
+    // table (the deliberate crush is the exception: that one is meant to land)
+    const p = this.player;
+    if (p && p.alive && !p.locked) {
+      this.limbs.forEach((l, i) => {
+        if (this.crush && this.crush.side === i) return;
+        for (const b of [l.fist, ...l.caps]) {
+          const cp = closestPoint(b, p.pos);
+          if (cp.dist >= p.R || cp.normal.y > -0.2) continue; // not overlapping, or it's under you
+          if (p.grip && p.grip.body.kind === 'giant') continue; // hanging on to him on purpose
+          let hx = cp.normal.x, hz = cp.normal.z, hl = Math.hypot(hx, hz);
+          if (hl < 0.2) { hx = p.pos.x - b.pos.x; hz = p.pos.z - b.pos.z; hl = Math.hypot(hx, hz) || 1; }
+          const out = (b.shape === 'box' ? Math.max(b.half.x, b.half.z) : b.r) + p.R + 0.02;
+          const c = b.shape === 'box' ? b.pos : cp.point;
+          p.pos = { x: c.x + (hx / hl) * out, y: Math.max(p.pos.y, TABLE_TOP_Y + p.R), z: c.z + (hz / hl) * out };
+          p.vel = { x: (hx / hl) * 1.2, y: 0.6, z: (hz / hl) * 1.2 };
+          if (p.grip) p.release('swept aside');
+          this.log('swept_aside', { by: b.label });
+          break;
+        }
       });
     }
     this.model.headMark.getWorldPosition(w);

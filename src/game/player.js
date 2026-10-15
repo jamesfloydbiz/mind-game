@@ -9,6 +9,7 @@ import {
 import { closestPoint, bodiesNear, breakBody, wake, vec } from './physics.js';
 
 const CUP_TIP_FALL = 0.5; // landing on a cup from this high knocks it over
+const RECOVER_TIME = 1.7; // rolling over and shaking it off after a root gives way
 
 const { v, sub, add, scale, dot, len } = vec;
 const cross = (a, b) => v(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
@@ -51,6 +52,7 @@ export class Player {
     this.yaw = Math.atan2(this.facing.x, this.facing.z);
     this.alive = true;
     this.locked = false; // a new life is never still held by the giant
+    this.recoverT = -1;
     this.poisonT = -1;
     this.stepPhase = 0;
     this.idleT = 0;
@@ -94,6 +96,17 @@ export class Player {
     if (!this.alive) return;
     if (this.poisonT >= 0) return this.stepPoison(dt, hooks);
     if (this.locked) { this.updateModel(dt, { fwd: 0, right: 0 }); this.writhe = 0; return; }
+    // knocked flat by a root giving way: roll over, shake it off, then carry on
+    if (this.recoverT >= 0) {
+      this.recoverT += dt;
+      this.vel.x *= 0.85; this.vel.z *= 0.85;
+      this.vel.y -= GRAVITY * dt;
+      this.pos = add(this.pos, scale(this.vel, dt));
+      this.collide();
+      this.updateModel(dt, { fwd: 0, right: 0 });
+      if (this.recoverT >= RECOVER_TIME) { this.recoverT = -1; this.log('recovered', {}); }
+      return;
+    }
 
     const any = Math.abs(input.fwd) > 0.1 || Math.abs(input.right) > 0.1 || input.jump || input.grabPressed;
     if (any) { this.idleT = 0; this.idleLogged = false; } else {
@@ -172,8 +185,10 @@ export class Player {
         const hv = Math.hypot(this.vel.x, this.vel.z);
         this.hooks && this.hooks.onLandCup(this.ground.meta.cup, hv > 0.1 ? { x: this.vel.x, z: this.vel.z } : this.facing);
       }
-      // onto the ground — including the roots lying on it
-      if (h >= DEATH_HEIGHT && (this.ground.kind === 'ground' || this.pos.y < 0.4)) { this.die('fall', this.hooks); }
+      // a root that gave way under you just knocks you flat; any other big fall onto the ground
+      // (including the roots lying on it) kills
+      if (this.fallCause === 'surface broke' && h > FALL_LOG_HEIGHT) { this.recoverT = 0; this.log('knocked_down', { height: +h.toFixed(3) }); }
+      else if (h >= DEATH_HEIGHT && (this.ground.kind === 'ground' || this.pos.y < 0.4)) { this.die('fall', this.hooks); }
       this.fallCause = null;
     }
     if (this.onGround) this.airMaxY = this.pos.y;
@@ -435,6 +450,17 @@ export class Player {
       leg.rotation.x = gait ? Math.sin(this.stepPhase + (i % 2 === 0 ? 0 : Math.PI) + (i > 1 ? Math.PI : 0)) * 0.7 : 0;
     });
     body.position.y = stepping ? Math.abs(Math.sin(this.stepPhase)) * 0.006 : 0;
+    if (this.recoverT >= 0) {
+      const r = this.recoverT;
+      // a roll across the back, then a full-body shake
+      const roll = Math.min(1, r / 0.65);
+      body.rotation.z = roll < 1 ? roll * Math.PI * 2 : 0;
+      body.position.y = roll < 1 ? Math.sin(roll * Math.PI) * 0.03 : 0;
+      const sh = r > 0.75 ? Math.max(0, 1 - (r - 0.75) / 0.8) : 0;
+      body.rotation.y = Math.sin(r * 55) * 0.35 * sh;
+      body.rotation.x = Math.sin(r * 47) * 0.12 * sh;
+      return;
+    }
     if (this.writhe > 0) {
       const w = this.writhe;
       body.rotation.z = Math.sin(this.t * 38) * 0.9 * w;

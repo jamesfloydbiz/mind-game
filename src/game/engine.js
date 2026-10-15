@@ -73,6 +73,7 @@ export class Engine {
     this.shake = 0;
     this.giant.onShake = (k) => { this.shake = Math.max(this.shake, k); };
     this.giant.onPoisonPlayer = (cup) => this.player.startPoison(cup, 'splashed');
+    this.giant.onFling = () => this.sound?.whoosh();
     this.giant.onSlain = (method) => this.onWin(method);
 
     this.lives = LIVES_PER_RUN;
@@ -210,7 +211,7 @@ export class Engine {
     else if (type === 'giant_impatient') s.voice('Choose.');
     else if (type === 'giant_crush') s.roar();
     else if (type === 'giant_crush_result') s.slam();
-    else if (type === 'giant_throw') { s.roar(); s.whoosh(); setTimeout(() => s.voice('You must make the choice on the table.'), 1400); }
+    else if (type === 'giant_throw') { s.roar(); setTimeout(() => s.voice('You must make the choice on the table.'), 4600); }
     else if (type === 'break') s.crack();
     else if (type === 'cup_tipped') s.clatter();
     else if (type === 'cup_spilled') s.splash();

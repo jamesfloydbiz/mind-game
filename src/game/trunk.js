@@ -172,6 +172,25 @@ export function buildTrunk(world, batch, group, mats) {
     }
   }
 
+  // A second, inner layer of roots, set between the outer ones and a little behind them, so there
+  // is no gap anywhere to squeeze through into the trunk or up under the tabletop. Hidden behind
+  // the outer roots (only a dark sliver shows through), slick.
+  for (let i = 0; i < ROOTS; i++) {
+    const th0 = ((i + 0.5) / ROOTS) * Math.PI * 2;
+    const pts = PROFILE.map((p, k) => {
+      const r = ROOT_R[k];
+      const q = surfacePoint(th0, p.y, -r * 1.1);
+      return { x: q.x, y: p.y + (k === 0 ? -0.06 : 0), z: q.z, r: r * 1.0 };
+    });
+    // its top tucks in just under the slab, out to the slab's edge
+    const top = pts[pts.length - 1];
+    const L = Math.hypot(top.x, top.z), dx = top.x / L, dz = top.z / L;
+    const t = slabEdge(dx, dz) - 0.06;
+    pts[pts.length - 1] = { x: dx * Math.max(L, t), y: TABLE_TOP_Y - 0.25 * 1.6 - top.r * 0.6, z: dz * Math.max(L, t), r: top.r };
+    for (let k = 0; k < pts.length - 1; k++) addCapsule(world, pts[k], pts[k + 1], (pts[k].r + pts[k + 1].r) / 2, { label: 'trunk', kind: 'bark', grip: 'none' });
+    batch.add('rootDark', taperedTube(pts, pts.map((p) => p.r * 0.9), 1300 + i, 6));
+  }
+
   // finer fibres laid over the braid (inside the collision envelope — look only)
   for (let i = 0; i < 90; i++) {
     const th = R() * Math.PI * 2;

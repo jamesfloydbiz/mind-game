@@ -56,8 +56,8 @@ Changes James asked for on 2026-10-13, layered on the brief in `docs/BRIEF.md`:
   (e.g. off his arm). It tips the way you push or were moving; the poison spills, and if it reaches
   his hands, arms or face he convulses and dies (`method: poison`). Spill on yourself and you die too.
 - **Skipping the table:** run into the fog on his side (z < -5) before you have reached the top and
-  he looms out of it and throws you back to the start (`giant_throw`, `where: fog`). Throws take
-  2.4s along an arc 9 high.
+  he looms out of it and throws you back to the start (`giant_throw`, `where: fog`). Every throw:
+  1.5s held, lifted and shaken, then 3s through the air on an arc 13.5 high, landing 2 past the start.
 - **Getting round him:** once he is at the table, going past the back of it (z < -(slab + 0.4)),
   on the ground or along his arm, makes him grab you and throw you back to the start: "You must make
   the choice on the table." (`giant_throw`)
@@ -83,3 +83,9 @@ Changes James asked for on 2026-10-13, layered on the brief in `docs/BRIEF.md`:
   voice (browser speech, pitched down), cracking roots, the cup, the spill, the eye, death. M mutes.
 - **Breaking the paradigm** is logged at the first: climbing onto him (not brushing him), reaching his
   eye, knocking a cup over, or trying to get round him.
+- **Snapping roots don't cost a life:** a rotten root giving way knocks you flat — you land, roll over
+  and shake it off (1.7s, `knocked_down` / `recovered`), then carry on. Other big falls still kill.
+- **The trunk is sealed:** an inner layer of roots sits between and behind the outer ones (and tucks
+  up under the slab), so there is no gap to climb inside the trunk or up under the table.
+- **His hands don't crush you by accident:** a hand or arm coming down on you shoves you aside
+  (`swept_aside`). Only the deliberate refusal crush lands.
