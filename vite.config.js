@@ -25,7 +25,9 @@ function api() {
   };
 }
 
+// GitHub Pages serves the site at /mind-game/ (set GH_PAGES=1 for that build)
 export default defineConfig({
+  base: process.env.GH_PAGES ? '/mind-game/' : '/',
   plugins: [react(), tailwindcss(), api()],
   server: { port: 4280, strictPort: true },
 });

@@ -75,10 +75,11 @@ export function buildBackdrop(scene) {
     async tryMarble() {
       // Marble splat worlds go in public/backdrops/world.spz; loaded with Spark when present.
       try {
-        const head = await fetch('/backdrops/world.spz', { method: 'HEAD' });
+        const url = `${import.meta.env.BASE_URL}backdrops/world.spz`;
+        const head = await fetch(url, { method: 'HEAD' });
         if (!head.ok || (head.headers.get('content-type') || '').includes('html')) return false;
         const { SplatMesh } = await import('@sparkjsdev/spark');
-        const splat = new SplatMesh({ url: '/backdrops/world.spz' });
+        const splat = new SplatMesh({ url });
         splat.scale.setScalar(40);
         splat.position.set(0, -2, 0);
         scene.add(splat);

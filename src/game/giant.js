@@ -198,6 +198,7 @@ export class Giant {
     p.vel = { x: 0, y: 0.5, z: push };
     p.onGround = false;
     p.airMaxY = p.pos.y;
+    p.fallCause = 'thrown by the giant';
   }
 
   // ---- the cups -----------------------------------------------------------------------------
@@ -346,6 +347,8 @@ export class Giant {
       player.airMaxY = to.y;
       player.onGround = true;
       player.wasGround = true;
+      player.fallCause = null;
+      player.recoverT = 0; // lands, rolls, shakes it off
       this.notice(['You must make the choice on the table'], 5);
       this.onThrown && this.onThrown();
     }
@@ -727,6 +730,7 @@ export class Giant {
           p.pos = { x: c.x + (hx / hl) * out, y: Math.max(p.pos.y, TABLE_TOP_Y + p.R), z: c.z + (hz / hl) * out };
           p.vel = { x: (hx / hl) * 1.2, y: 0.6, z: (hz / hl) * 1.2 };
           if (p.grip) p.release('swept aside');
+          p.fallCause = 'thrown by the giant';
           this.log('swept_aside', { by: b.label });
           break;
         }

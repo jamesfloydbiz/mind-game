@@ -19,6 +19,10 @@ bun run dev        # http://localhost:4280
 - `bun test` — physics unit tests.
 - `bun run build && bun run start` — production build served on :4281.
 
+**Public copy:** every push to `main` builds a static version to GitHub Pages
+(https://jamesfloydbiz.github.io/mind-game/, `bun run build:pages`). It plays the same but saves no
+runs; `/logs` there just says so. Real sessions use the local server above.
+
 `.env` (gitignored, see `.env.example`): `LOGS_PASSWORD`, `WORLDLABS_API_KEY`.
 Run logs are stored in `data/runlogs.sqlite` (gitignored — they can contain participant data).
 
@@ -83,8 +87,10 @@ Changes James asked for on 2026-10-13, layered on the brief in `docs/BRIEF.md`:
   voice (browser speech, pitched down), cracking roots, the cup, the spill, the eye, death. M mutes.
 - **Breaking the paradigm** is logged at the first: climbing onto him (not brushing him), reaching his
   eye, knocking a cup over, or trying to get round him.
-- **Snapping roots don't cost a life:** a rotten root giving way knocks you flat — you land, roll over
-  and shake it off (1.7s, `knocked_down` / `recovered`), then carry on. Other big falls still kill.
+- **Root falls and throws don't cost a life:** a rotten root snapping, slipping off a wet one,
+  letting go of a root, being thrown back by the giant or shoved off by his hands all knock you
+  flat — you land, roll over and shake it off (1.7s, `knocked_down` / `recovered`), then carry on.
+  Other big falls (stepping off the table edge, dropping off his head) still kill.
 - **The trunk is sealed:** an inner layer of roots sits between and behind the outer ones (and tucks
   up under the slab), so there is no gap to climb inside the trunk or up under the table.
 - **His hands don't crush you by accident:** a hand or arm coming down on you shoves you aside

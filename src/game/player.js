@@ -10,6 +10,8 @@ import { closestPoint, bodiesNear, breakBody, wake, vec } from './physics.js';
 
 const CUP_TIP_FALL = 0.5; // landing on a cup from this high knocks it over
 const RECOVER_TIME = 1.7; // rolling over and shaking it off after a root gives way
+// falls that knock you down instead of killing: anything off a root, anything the giant does to you
+const SOFT_FALLS = new Set(['surface broke', 'slipped', 'came off a root', 'thrown by the giant']);
 
 const { v, sub, add, scale, dot, len } = vec;
 const cross = (a, b) => v(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
@@ -86,6 +88,8 @@ export class Player {
     if (!this.grip) return;
     this.log('release', { target: this.grip.body.label, reason });
     if (this.route) this.route.ending = reason;
+    // coming off a root, however it happens, is a fall that knocks you down rather than kills
+    if (this.grip.body.kind === 'root' && !this.fallCause) this.fallCause = 'came off a root';
     this.grip = null;
   }
 
@@ -187,7 +191,7 @@ export class Player {
       }
       // a root that gave way under you just knocks you flat; any other big fall onto the ground
       // (including the roots lying on it) kills
-      if (this.fallCause === 'surface broke' && h > FALL_LOG_HEIGHT) { this.recoverT = 0; this.log('knocked_down', { height: +h.toFixed(3) }); }
+      if (SOFT_FALLS.has(this.fallCause) && h > FALL_LOG_HEIGHT) { this.recoverT = 0; this.log('knocked_down', { height: +h.toFixed(3), cause: this.fallCause }); }
       else if (h >= DEATH_HEIGHT && (this.ground.kind === 'ground' || this.pos.y < 0.4)) { this.die('fall', this.hooks); }
       this.fallCause = null;
     }
@@ -372,6 +376,7 @@ export class Player {
     // topped out: the contact normal points (nearly) straight up
     if (n.y > 0.85) {
       this.release('topped out');
+      this.fallCause = null; // standing on top now, not falling
       this.onGround = true;
       this.ground = b;
       this.wasGround = true;

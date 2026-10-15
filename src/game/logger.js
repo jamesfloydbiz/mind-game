@@ -5,6 +5,9 @@ const MAX_SAMPLES = 900;
 const PARTIAL_EVERY_MS = 30000;
 const PARTIAL_MIN_EVENTS = 40;
 
+// On the public static site (GitHub Pages) there is no server to save runs to: nothing is sent.
+const STATIC = import.meta.env.VITE_STATIC === '1';
+
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'r-' + Math.random().toString(36).slice(2) + Date.now().toString(36));
 
 export class Logger {
@@ -98,7 +101,7 @@ export class Logger {
   }
 
   persist(beacon = false) {
-    if (!this.life) return;
+    if (!this.life || STATIC) return;
     const body = JSON.stringify(this.record());
     this.life.persisted = true;
     if (beacon && navigator.sendBeacon) {

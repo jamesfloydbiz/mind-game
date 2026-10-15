@@ -4,6 +4,16 @@ import EventTimeline from './EventTimeline.jsx';
 
 // Researcher viewer at /logs (noindex). Reads need the LOGS_PASSWORD set in .env.
 export default function LogsPage() {
+  if (import.meta.env.VITE_STATIC === '1') {
+    return (
+      <div className="min-h-full bg-field px-6 py-10 font-oswald text-ink">
+        <div className="mx-auto max-w-xl">
+          <h1 className="text-lg font-light uppercase mg-track">Mind Game · Run logs</h1>
+          <p className="mt-4 text-sm font-light leading-relaxed tracking-wide text-ink/75">This public copy of the game doesn't save runs. Run logs, replays and participant data live only on the local server used for supervised sessions (<code>bun run dev</code>).</p>
+        </div>
+      </div>
+    );
+  }
   const [pw, setPw] = useState(() => sessionStorage.getItem('mg_logs_pw') || '');
   const [rows, setRows] = useState(null);
   const [error, setError] = useState('');

@@ -6,7 +6,8 @@ import ProctorPage from './components/proctor/ProctorPage.jsx';
 
 // Routes: "/" = landing → game (mounted on the "mindgame:start" event), "/logs" = researcher viewer.
 export default function App() {
-  const [path] = useState(() => window.location.pathname);
+  // strip the site's base (/mind-game/ on GitHub Pages) so routes work in both places
+  const [path] = useState(() => '/' + window.location.pathname.slice(import.meta.env.BASE_URL.length));
   const [game, setGame] = useState(null); // { name, run }
 
   useEffect(() => {

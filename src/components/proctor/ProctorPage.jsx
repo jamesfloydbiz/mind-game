@@ -14,7 +14,7 @@ export default function ProctorPage() {
     while (set.size < Math.max(1, Math.min(200, count))) set.add(makeCode(prefix.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)));
     setCodes([...set]);
   };
-  const link = (c) => `${window.location.origin}/?code=${c}`;
+  const link = (c) => `${window.location.origin}${import.meta.env.BASE_URL}?code=${c}`;
   const copyAll = () => navigator.clipboard?.writeText(codes.map((c) => `${c}\t${link(c)}`).join('\n'));
   return (
     <div className="min-h-full bg-field px-6 py-8 font-oswald text-ink">
